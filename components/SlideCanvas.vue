@@ -13,6 +13,7 @@
       @click="(e) => { if (props.disabled) return; props.selectElement(i, e.shiftKey || e.ctrlKey || e.metaKey) }"
     >
       <img v-if="el.type === 'image'" :src="el.content" class="slide-el-img" />
+      <div v-else-if="el.type === 'rect'" :style="{ width: '100%', height: '100%', background: el.background || '#1976d2', borderRadius: '8px', boxShadow: el.shadow ? '0 2px 8px #0003' : 'none', border: '1.5px solid #1976d2' }"></div>
       <template v-else>
         <div
           v-if="!props.isEditingText(i)"
@@ -89,6 +90,7 @@ const props = defineProps([
   'onCanvasMouseDown',
   'onCanvasMouseMove',
   'onCanvasMouseUp',
+  'zoom',
 ])
 const canvasStyle = computed(() => ({
   width: props.canvasWidth + 'px',

@@ -233,7 +233,7 @@
 }
 .keynote-panel {
   min-width: 280px;
-  max-width: 340px;
+  max-width: 400px;
   flex: 1 1 320px;
   background: #fff;
   border-radius: 20px;
@@ -368,7 +368,7 @@ input:focus {
 }
 .right-edit-panel {
   min-width: 260px;
-  max-width: 340px;
+  max-width: 400px;
   margin: 36px 24px 0 24px;
   box-shadow: 0 2px 12px #007aff11;
   background: #fafdff;

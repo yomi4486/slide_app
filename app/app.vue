@@ -1,6 +1,6 @@
 <template>
   <div class="keynote-bg keynote-flex">
-    <SlideListMenu :slides="slides" :current="current" @goTo="goTo" />
+    <SlideListMenu :slides="slides" :current="current" @goTo="goTo" @addSlide="addSlide" />
     <main class="keynote-main main-flex">
       <div class="main-center">
         <div style="text-align:center; position:relative; width:100%; display:flex; flex-direction:column; align-items:center;">
@@ -38,38 +38,46 @@
               zIndex: 1000,
               pointerEvents: 'none',
             }"></div>
-            <SlideCanvas
-              :elements="slides[current].elements"
-              :selectedElements="selectedElements"
-              :selectElement="selectElement"
-              :startDrag="startDrag"
-              :startResize="startResize"
-              :isEditingText="isEditingText"
-              :startInlineEdit="startInlineEdit"
-              :finishInlineEdit="finishInlineEdit"
-              :inlineEditValue="inlineEditValue"
-              @update:inlineEditValue="v => inlineEditValue = v"
-              :inlineEditInput="inlineEditInput"
-              :textElementStyle="textElementStyle"
-              :elementStyle="elementStyle"
-              :clearSelection="clearSelection"
-              :dragSelect="dragSelect"
-              :dragRect="dragRect"
-              :canvasWrapper="canvasWrapper"
-              :onCanvasMouseDown="onCanvasMouseDown"
-              :onCanvasMouseMove="onCanvasMouseMove"
-              :onCanvasMouseUp="onCanvasMouseUp"
-              :canvasWidth="canvasWidth"
-              :canvasHeight="canvasHeight"
+            <div class="canvas-zoom-wrapper">
+              <div :style="zoom.value < 1 ? { transform: `scale(${zoom.value})`, transformOrigin: 'top left', width: baseWidth + 'px', height: baseHeight + 'px' } : { width: baseWidth + 'px', height: baseHeight + 'px' }">
+                <SlideCanvas
+                  :elements="slides[current].elements"
+                  :selectedElements="selectedElements"
+                  :selectElement="selectElement"
+                  :startDrag="startDrag"
+                  :startResize="startResize"
+                  :isEditingText="isEditingText"
+                  :startInlineEdit="startInlineEdit"
+                  :finishInlineEdit="finishInlineEdit"
+                  :inlineEditValue="inlineEditValue"
+                  @update:inlineEditValue="v => inlineEditValue = v"
+                  :inlineEditInput="inlineEditInput"
+                  :textElementStyle="textElementStyle"
+                  :elementStyle="elementStyle"
+                  :clearSelection="clearSelection"
+                  :dragSelect="dragSelect"
+                  :dragRect="dragRect"
+                  :canvasWrapper="canvasWrapper"
+                  :onCanvasMouseDown="onCanvasMouseDown"
+                  :onCanvasMouseMove="onCanvasMouseMove"
+                  :onCanvasMouseUp="onCanvasMouseUp"
+                  :canvasWidth="baseWidth"
+                  :canvasHeight="baseHeight"
+                  :zoom="zoom.value"
+                />
+              </div>
+            </div>
+          </div>
+          <div v-if="selectedElements.length" style="position: fixed; top: 32px; right: 32px; z-index: 4000;">
+            <ElementEditPanel
+              v-if="selectedElements.length"
+              :currentEls="currentEls"
+              @removeElement="removeElement"
+              @moveElementZ="moveElementZ"
             />
           </div>
         </div>
       </div>
-      <ElementEditPanel
-        v-if="selectedElements.length"
-        :currentEls="currentEls"
-        @removeElement="removeElement"
-      />
     </main>
   </div>
 </template>
@@ -198,9 +206,14 @@ function removeElement() {
 // 要素追加
 function addElement(type) {
   pushHistory()
-  const el = type === 'image'
-    ? { type: 'image', content: '', x: 100, y: 100, width: 200, height: 120, shadow: false, background: '' }
-    : { type: 'text', content: 'テキスト', x: 150, y: 150, width: 200, height: 60, fontSize: 32, color: '#222222', shadow: false, background: '' }
+  let el
+  if (type === 'image') {
+    el = { type: 'image', content: '', x: 100, y: 100, width: 200, height: 120, shadow: false, background: '' }
+  } else if (type === 'text') {
+    el = { type: 'text', content: 'テキスト', x: 150, y: 150, width: 200, height: 60, fontSize: 32, color: '#222222', shadow: false, background: '' }
+  } else if (type === 'rect') {
+    el = { type: 'rect', x: 120, y: 120, width: 200, height: 120, background: '#1976d2', shadow: false }
+  }
   slides.value[current.value].elements.push(el)
   selectedElement.value = slides.value[current.value].elements.length - 1
 }
@@ -346,8 +359,8 @@ let dragStart = null
 function getCanvasOffset(e) {
   const rect = canvasWrapper.value.getBoundingClientRect()
   return {
-    x: e.clientX - rect.left,
-    y: e.clientY - rect.top
+    x: (e.clientX - rect.left) / zoom.value,
+    y: (e.clientY - rect.top) / zoom.value
   }
 }
 function onCanvasMouseDown(e) {
@@ -410,17 +423,20 @@ function elementStyle(el, idx) {
 }
 function textElementStyle(el) {
   if (el.type !== 'text') return {}
+  let justify = 'center';
+  if (el.textAlign === 'left') justify = 'flex-start';
+  if (el.textAlign === 'right') justify = 'flex-end';
   return {
     fontSize: (el.fontSize || 32) + 'px',
     color: el.color || '#222222',
     width: '100%',
     height: '100%',
     fontWeight: 600,
-    textAlign: 'center',
+    textAlign: el.textAlign || 'center',
     wordBreak: 'break-word',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: justify,
     background: 'none',
     pointerEvents: 'none'
   }
@@ -431,6 +447,23 @@ function handleKeydown(e) {
   // テキスト編集中やinput/textareaにフォーカス時は無視
   const tag = document.activeElement?.tagName?.toLowerCase()
   if (tag === 'input' || tag === 'textarea') return
+  // スライド切り替え（上下矢印）
+  if (e.key === 'ArrowUp') {
+    if (current.value > 0) {
+      current.value--
+      selectedElements.value = []
+      e.preventDefault()
+    }
+    return
+  }
+  if (e.key === 'ArrowDown') {
+    if (current.value < slides.value.length - 1) {
+      current.value++
+      selectedElements.value = []
+      e.preventDefault()
+    }
+    return
+  }
   // Undo: Cmd+Z / Ctrl+Z
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
     undo()
@@ -443,33 +476,58 @@ function handleKeydown(e) {
     e.preventDefault()
     return
   }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedElements.value.length) {
-    removeElement()
+  if ((e.key === 'Delete' || e.key === 'Backspace')) {
+    if (selectedElements.value.length) {
+      removeElement()
+    } else if (slides.value.length > 1) {
+      // スライドが1枚だけの場合は消さない
+      pushHistory()
+      slides.value.splice(current.value, 1)
+      // 削除後のインデックス調整
+      if (current.value >= slides.value.length) {
+        current.value = slides.value.length - 1
+      }
+    }
   }
   // Escキーで選択解除
   if (e.key === 'Escape' && selectedElements.value.length) {
     clearSelection()
   }
   // コピー（Ctrl+C/Cmd+C）
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedElements.value.length) {
-    const els = selectedElements.value.map(idx => slides.value[current.value].elements[idx])
-    clipboard.value = JSON.parse(JSON.stringify(els))
-    e.preventDefault()
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+    if (selectedElements.value.length) {
+      const els = selectedElements.value.map(idx => slides.value[current.value].elements[idx])
+      clipboard.value = JSON.parse(JSON.stringify(els))
+      e.preventDefault()
+    } else {
+      // スライド全体をコピー
+      clipboard.value = { slide: JSON.parse(JSON.stringify(slides.value[current.value])) }
+      e.preventDefault()
+    }
   }
   // ペースト（Ctrl+V/Cmd+V）
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v' && clipboard.value) {
-    // 複製して少しずらして追加
-    const pastedArr = Array.isArray(clipboard.value) ? clipboard.value : [clipboard.value]
-    const newIdxs = []
-    pastedArr.forEach(pasted => {
-      const newEl = JSON.parse(JSON.stringify(pasted))
-      newEl.x = (newEl.x || 0) + 30
-      newEl.y = (newEl.y || 0) + 30
-      slides.value[current.value].elements.push(newEl)
-      newIdxs.push(slides.value[current.value].elements.length - 1)
-    })
-    selectedElements.value = newIdxs
-    e.preventDefault()
+    if (Array.isArray(clipboard.value)) {
+      // 要素のペースト
+      const pastedArr = clipboard.value
+      const newIdxs = []
+      pastedArr.forEach(pasted => {
+        const newEl = JSON.parse(JSON.stringify(pasted))
+        newEl.x = (newEl.x || 0) + 30
+        newEl.y = (newEl.y || 0) + 30
+        slides.value[current.value].elements.push(newEl)
+        newIdxs.push(slides.value[current.value].elements.length - 1)
+      })
+      selectedElements.value = newIdxs
+      e.preventDefault()
+    } else if (clipboard.value.slide) {
+      // スライドのペースト
+      pushHistory()
+      slides.value.splice(current.value + 1, 0, JSON.parse(JSON.stringify(clipboard.value.slide)))
+      current.value = current.value + 1
+      selectedElements.value = []
+      e.preventDefault()
+    }
   }
 }
 function clearSelection() {
@@ -573,8 +631,52 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
+
+const baseWidth = 1280;
+const baseHeight = 720;
+const zoom = computed(() => {
+  const scaleW = window.innerWidth / baseWidth;
+  const scaleH = window.innerHeight / baseHeight;
+  return Math.min(scaleW, scaleH, 1); // 1より大きくならない
+});
+
+function addSlide() {
+  pushHistory()
+  slides.value.push({ elements: [] })
+  current.value = slides.value.length - 1
+  selectedElements.value = []
+}
+
+function moveElementZ(direction) {
+  if (!selectedElements.value.length) return
+  const idx = selectedElements.value[0]
+  const els = slides.value[current.value].elements
+  if (direction === 'up' && idx < els.length - 1) {
+    // 前面へ
+    [els[idx], els[idx + 1]] = [els[idx + 1], els[idx]]
+    selectedElements.value = [idx + 1]
+  } else if (direction === 'down' && idx > 0) {
+    // 背面へ
+    [els[idx], els[idx - 1]] = [els[idx - 1], els[idx]]
+    selectedElements.value = [idx - 1]
+  }
+}
 </script>
 
 <style>
 @import '../assets/common.css';
+.keynote-main .main-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+.canvas-zoom-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+}
 </style>

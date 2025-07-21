@@ -2,6 +2,7 @@
   <div class="add-bar">
     <button @click="$emit('addElement', 'image')">＋ 画像追加</button>
     <button @click="$emit('addElement', 'text')">＋ テキスト追加</button>
+    <button @click="$emit('addElement', 'rect')">＋ 四角形追加</button>
     <button @click="$emit('saveSlides')">💾 保存</button>
     <button @click="() => fileInput.click()">📂 開く</button>
     <button @click="$emit('newSlides')">🆕 新規</button>
