@@ -1,6 +1,6 @@
 <template>
   <div class="slideshow keynote-slide slide-canvas"
-    @mousedown.self="props.onCanvasMouseDown"
+    @mousedown.self="(e) => { props.onCanvasMouseDown && props.onCanvasMouseDown(e); props.clearSelection && props.clearSelection() }"
     :style="canvasStyle"
   >
     <div
@@ -13,6 +13,7 @@
       @click="(e) => { if (props.disabled) return; props.selectElement(i, e.shiftKey || e.ctrlKey || e.metaKey) }"
     >
       <img v-if="el.type === 'image'" :src="el.content" class="slide-el-img" />
+      <div v-else-if="el.type === 'rect'" :style="{ width: '100%', height: '100%', background: el.background || '#1976d2', borderRadius: '8px', boxShadow: el.shadow ? '0 2px 8px #0003' : 'none', border: '1.5px solid #1976d2' }"></div>
       <template v-else>
         <div
           v-if="!props.isEditingText(i)"
@@ -37,8 +38,8 @@
           @dblclick.stop
         />
       </template>
-      <!-- リサイズハンドル（選択中のみ） -->
-      <template v-if="props.selectedElements && props.selectedElements.includes(i)">
+      <!-- リサイズハンドル（選択中のみ、スライドショーでなければ） -->
+      <template v-if="props.selectedElements && props.selectedElements.includes(i) && !props.slideshow">
         <div
           v-for="dir in ['nw','ne','sw','se','n','e','s','w']"
           :key="dir"
@@ -89,6 +90,8 @@ const props = defineProps([
   'onCanvasMouseDown',
   'onCanvasMouseMove',
   'onCanvasMouseUp',
+  'zoom',
+  'slideshow', // 追加
 ])
 const canvasStyle = computed(() => ({
   width: props.canvasWidth + 'px',
@@ -121,4 +124,21 @@ defineEmits(['update:inlineEditValue'])
 </script>
 <style>
 @import '../assets/common.css';
+.slide-canvas, .slide-el, .slide-el-text, .slide-el-text-input {
+  font-family: 'Inter', 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif !important;
+}
+.slide-canvas {
+  /* 既存のスタイル */
+  position: relative;
+  overflow: hidden;
+}
+.slide-canvas {
+  border-radius: 32px;
+  background: #fff;
+  box-shadow: 0 8px 32px #0002, 0 1.5px 6px #0001;
+}
+.slide-canvas[slideshow] {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
 </style> 

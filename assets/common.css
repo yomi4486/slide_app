@@ -95,7 +95,6 @@
   align-items: center;
   justify-content: flex-start;
   width: 100%;
-  max-width: 720px;
   margin: 36px auto 0 auto;
   padding: 0 0 18px 0;
 }
@@ -141,7 +140,6 @@
 
 /* 既存のKeynote風スタイルはそのまま */
 .slideshow.keynote-slide {
-  max-width: 720px;
   width: 100%;
   margin: 0 auto 32px auto;
   padding: 0;
@@ -235,7 +233,7 @@
 }
 .keynote-panel {
   min-width: 280px;
-  max-width: 340px;
+  max-width: 400px;
   flex: 1 1 320px;
   background: #fff;
   border-radius: 20px;
@@ -370,7 +368,7 @@ input:focus {
 }
 .right-edit-panel {
   min-width: 260px;
-  max-width: 340px;
+  max-width: 400px;
   margin: 36px 24px 0 24px;
   box-shadow: 0 2px 12px #007aff11;
   background: #fafdff;
@@ -397,6 +395,69 @@ input:focus {
 .handle-s { left: 50%; bottom: -7px; transform: translateX(-50%); cursor: ns-resize; }
 .handle-w { left: -7px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
 .slide-el.selected { z-index: 20; }
+
+.keynote-main, .keynote-main.main-flex {
+  height: 100vh;
+  min-height: 0;
+}
+.main-center {
+  height: 100%;
+  min-height: 0;
+}
+.slide-canvas {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.canvas-zoom-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
+  overflow: auto;
+  position: relative;
+}
+.canvas-zoom-ui {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 9999;
+  display: flex;
+  gap: 8px;
+  background: #fff9;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px #007aff22;
+  padding: 6px 14px;
+  align-items: center;
+  user-select: none;
+}
+.canvas-zoom-ui button {
+  background: #fff;
+  color: #007aff;
+  border: 1.5px solid #007aff44;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 1.1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.canvas-zoom-ui button:disabled {
+  background: #f0f0f0;
+  color: #aaa;
+  border-color: #ccc;
+  cursor: not-allowed;
+}
+.canvas-zoom-ui span {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #007aff;
+  min-width: 48px;
+  text-align: center;
+}
 
 @media (max-width: 900px) {
   .keynote-flex {
@@ -464,5 +525,12 @@ input:focus {
     min-width: 0;
     max-width: 100vw;
     margin: 16px 8px 0 8px;
+  }
+}
+@media (max-width: 600px) {
+  .canvas-zoom-ui {
+    right: 8px;
+    bottom: 8px;
+    padding: 4px 8px;
   }
 } 
