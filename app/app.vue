@@ -4,10 +4,27 @@
     <main class="keynote-main main-flex">
       <div class="main-center">
         <div style="text-align:center; position:relative; width:100%; display:flex; flex-direction:column; align-items:center;">
-          <AddBar @addElement="addElement" />
+          <div
+            :style="{
+              position: 'fixed',
+              left: addBarX + 'px',
+              top: addBarY + 'px',
+              zIndex: 3000,
+              cursor: addBarDragging ? 'move' : 'grab',
+              userSelect: addBarDragging ? 'none' : 'auto',
+            }"
+            @mousedown="startAddBarDrag"
+          >
+            <AddBar @addElement="addElement"
+                    @saveSlides="saveSlides"
+                    @openSlides="openSlides"
+                    @newSlides="newSlides"
+                    @localSave="localSave"
+            />
+          </div>
           <div
             ref="canvasWrapper"
-            style="position:relative; width:100%; max-width:720px; aspect-ratio:16/9; margin:0 auto; background:transparent;"
+            style="position:relative; width:100%; aspect-ratio:16/9; margin:0 auto; background:transparent;"
           >
             <!-- ドラッグ選択用の矩形 -->
             <div v-if="dragSelect" :style="{
@@ -42,6 +59,8 @@
               :onCanvasMouseDown="onCanvasMouseDown"
               :onCanvasMouseMove="onCanvasMouseMove"
               :onCanvasMouseUp="onCanvasMouseUp"
+              :canvasWidth="canvasWidth"
+              :canvasHeight="canvasHeight"
             />
           </div>
         </div>
@@ -56,7 +75,7 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount } from 'vue'
 import SlideListMenu from '../components/SlideListMenu.vue'
 import AddBar from '../components/AddBar.vue'
 import SlideCanvas from '../components/SlideCanvas.vue'
@@ -123,6 +142,33 @@ function redo() {
   selectedElements.value = []
 }
 const canvasWrapper = ref(null)
+
+// 画面いっぱいの16:9キャンバスサイズ計算
+const canvasWidth = ref(1280)
+const canvasHeight = ref(720)
+function updateCanvasSize() {
+  const sidebarWidth = 260; // サイドバーの実際の幅に合わせて調整
+  const w = window.innerWidth - sidebarWidth;
+  const cw = w;
+  const ch = cw * 9 / 16;
+  canvasWidth.value = Math.floor(cw);
+  canvasHeight.value = Math.floor(ch);
+}
+onMounted(() => {
+  const barWidth = 420
+  const barHeight = 60
+  const margin = 75
+  addBarX.value = window.innerWidth - barWidth - margin - 255
+  addBarY.value = window.innerHeight - barHeight - margin
+  window.addEventListener('keydown', handleKeydown)
+  // サイトを開いた時点でローカルデータ自動読込
+  localLoad()
+  updateCanvasSize()
+  window.addEventListener('resize', updateCanvasSize)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateCanvasSize)
+})
 
 // 要素の選択・編集
 const selectedElements = ref([]) // 複数選択対応
@@ -429,8 +475,100 @@ function handleKeydown(e) {
 function clearSelection() {
   selectedElements.value = []
 }
+// スライド保存
+function saveSlides() {
+  const data = JSON.stringify(slides.value, null, 2)
+  const blob = new Blob([data], {type: 'application/json'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'slides.json'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+// スライド読込
+function openSlides(jsonStr) {
+  try {
+    const arr = JSON.parse(jsonStr)
+    if (Array.isArray(arr) && arr.every(s => s.elements)) {
+      slides.value = arr
+      current.value = 0
+      selectedElements.value = []
+    } else {
+      alert('不正なスライドデータです')
+    }
+  } catch {
+    alert('ファイルの読み込みに失敗しました')
+  }
+}
+// 新規作成
+function newSlides() {
+  if (!confirm('現在のスライドを消去して新規作成します。よろしいですか？')) return
+  slides.value = [
+    { elements: [] }
+  ]
+  current.value = 0
+  selectedElements.value = []
+}
+// ローカル保存
+function localSave() {
+  try {
+    localStorage.setItem('mySlides', JSON.stringify(slides.value))
+    alert('ローカル保存しました')
+  } catch {
+    alert('ローカル保存に失敗しました')
+  }
+}
+// ローカル読込
+function localLoad() {
+  const saved = localStorage.getItem('mySlides')
+  if (saved) {
+    try {
+      const arr = JSON.parse(saved)
+      if (Array.isArray(arr) && arr.every(s => s.elements)) {
+        slides.value = arr
+        current.value = 0
+        selectedElements.value = []
+      } else {
+        alert('ローカルデータが不正です')
+      }
+    } catch {
+      alert('ローカルデータの読込に失敗しました')
+    }
+  } else {
+    alert('ローカルに保存されたデータがありません')
+  }
+}
+// AddBarのドラッグ移動
+const addBarX = ref(0)
+const addBarY = ref(0)
+const addBarDragging = ref(false)
+let addBarDragOffset = {x:0, y:0}
+function startAddBarDrag(e) {
+  addBarDragging.value = true
+  addBarDragOffset = {
+    x: e.clientX - addBarX.value,
+    y: e.clientY - addBarY.value
+  }
+  window.addEventListener('mousemove', onAddBarDrag)
+  window.addEventListener('mouseup', stopAddBarDrag)
+}
+function onAddBarDrag(e) {
+  if (!addBarDragging.value) return
+  addBarX.value = e.clientX - addBarDragOffset.x
+  addBarY.value = e.clientY - addBarDragOffset.y
+}
+function stopAddBarDrag() {
+  addBarDragging.value = false
+  window.removeEventListener('mousemove', onAddBarDrag)
+  window.removeEventListener('mouseup', stopAddBarDrag)
+}
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
+  // サイトを開いた時点でローカルデータ自動読込
+  localLoad()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeydown)
