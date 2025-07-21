@@ -1,6 +1,6 @@
 <template>
   <div class="slideshow keynote-slide slide-canvas"
-    @mousedown.self="props.onCanvasMouseDown"
+    @mousedown.self="(e) => { props.onCanvasMouseDown && props.onCanvasMouseDown(e); props.clearSelection && props.clearSelection() }"
     :style="canvasStyle"
   >
     <div
@@ -38,8 +38,8 @@
           @dblclick.stop
         />
       </template>
-      <!-- リサイズハンドル（選択中のみ） -->
-      <template v-if="props.selectedElements && props.selectedElements.includes(i)">
+      <!-- リサイズハンドル（選択中のみ、スライドショーでなければ） -->
+      <template v-if="props.selectedElements && props.selectedElements.includes(i) && !props.slideshow">
         <div
           v-for="dir in ['nw','ne','sw','se','n','e','s','w']"
           :key="dir"
@@ -91,6 +91,7 @@ const props = defineProps([
   'onCanvasMouseMove',
   'onCanvasMouseUp',
   'zoom',
+  'slideshow', // 追加
 ])
 const canvasStyle = computed(() => ({
   width: props.canvasWidth + 'px',
@@ -123,4 +124,21 @@ defineEmits(['update:inlineEditValue'])
 </script>
 <style>
 @import '../assets/common.css';
+.slide-canvas, .slide-el, .slide-el-text, .slide-el-text-input {
+  font-family: 'Inter', 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif !important;
+}
+.slide-canvas {
+  /* 既存のスタイル */
+  position: relative;
+  overflow: hidden;
+}
+.slide-canvas {
+  border-radius: 32px;
+  background: #fff;
+  box-shadow: 0 8px 32px #0002, 0 1.5px 6px #0001;
+}
+.slide-canvas[slideshow] {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
 </style> 

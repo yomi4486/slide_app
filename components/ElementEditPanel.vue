@@ -8,7 +8,7 @@
     <template v-if="currentEl?.type === 'text'">
       <div class="edit-group">
         <label class="edit-label">テキスト</label>
-        <input v-model="currentEl.content" class="edit-input" />
+        <textarea v-model="currentEl.content" class="edit-input" rows="2" style="resize:vertical; min-height:38px;"></textarea>
       </div>
       <div class="edit-row">
         <div class="edit-group">
