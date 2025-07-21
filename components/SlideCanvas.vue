@@ -1,0 +1,124 @@
+<template>
+  <div class="slideshow keynote-slide slide-canvas"
+    @mousedown.self="props.onCanvasMouseDown"
+    :style="canvasStyle"
+  >
+    <div
+      v-for="(el, i) in props.elements"
+      :key="i"
+      class="slide-el"
+      :class="{ selected: props.selectedElements && props.selectedElements.includes(i) }"
+      :style="props.elementStyle(el, i)"
+      @mousedown="(e) => { if (props.disabled) return; if (el.type === 'text' && props.isEditingText(i)) return; props.startDrag(i, e) }"
+      @click="(e) => { if (props.disabled) return; props.selectElement(i, e.shiftKey || e.ctrlKey || e.metaKey) }"
+    >
+      <img v-if="el.type === 'image'" :src="el.content" class="slide-el-img" />
+      <template v-else>
+        <div
+          v-if="!props.isEditingText(i)"
+          class="slide-el-text"
+          :style="props.textElementStyle(el)"
+          @dblclick="() => { if (props.disabled) return; props.startInlineEdit(i, el.content) }"
+          @mousedown.stop
+        >
+          {{ el.content }}
+        </div>
+        <input
+          v-else
+          class="slide-el-text-input"
+          :style="props.textElementStyle(el)"
+          :value="props.inlineEditValue"
+          ref="props.inlineEditInput"
+          @input="$emit('update:inlineEditValue', $event.target.value)"
+          @blur="props.finishInlineEdit(true)"
+          @keydown.enter.stop.prevent="props.finishInlineEdit(true)"
+          @keydown.esc.stop.prevent="props.finishInlineEdit(false)"
+          @mousedown.stop
+          @dblclick.stop
+        />
+      </template>
+      <!-- リサイズハンドル（選択中のみ） -->
+      <template v-if="props.selectedElements && props.selectedElements.includes(i)">
+        <div
+          v-for="dir in ['nw','ne','sw','se','n','e','s','w']"
+          :key="dir"
+          class="resize-handle"
+          :class="'handle-' + dir"
+          @pointerdown.stop="(e) => { if (props.disabled) return; props.startResize(i, dir, e) }"
+        ></div>
+      </template>
+    </div>
+    <!-- ドラッグ選択用の矩形 -->
+    <div v-if="props.dragSelect" :style="{
+      position: 'absolute',
+      left: Math.min(props.dragRect.x, props.dragRect.x + props.dragRect.w) + 'px',
+      top: Math.min(props.dragRect.y, props.dragRect.y + props.dragRect.h) + 'px',
+      width: Math.abs(props.dragRect.w) + 'px',
+      height: Math.abs(props.dragRect.h) + 'px',
+      background: '#1976d233',
+      border: '2px dashed #1976d2',
+      zIndex: 1000,
+      pointerEvents: 'none',
+    }"></div>
+  </div>
+</template>
+<script setup>
+import { computed, onMounted, onBeforeUnmount, watch } from 'vue'
+const props = defineProps([
+  'elements',
+  'selectedElements',
+  'selectElement',
+  'startDrag',
+  'startResize',
+  'isEditingText',
+  'startInlineEdit',
+  'finishInlineEdit',
+  'inlineEditValue',
+  'inlineEditInput',
+  'textElementStyle',
+  'elementStyle',
+  'clearSelection',
+  'disabled',
+  'canvasWidth',
+  'canvasHeight',
+  'canvasLeft',
+  'canvasTop',
+  'dragSelect',
+  'dragRect',
+  'canvasWrapper',
+  'onCanvasMouseDown',
+  'onCanvasMouseMove',
+  'onCanvasMouseUp',
+])
+const canvasStyle = computed(() => ({
+  width: props.canvasWidth + 'px',
+  height: props.canvasHeight + 'px',
+  position: 'absolute',
+  left: props.canvasLeft + 'px',
+  top: props.canvasTop + 'px',
+  minWidth: 0,
+  minHeight: 0
+}))
+// ドラッグ選択のmousemove/upイベントを動的に付け外し
+let moveHandler = null
+let upHandler = null
+watch(() => props.dragSelect, (val) => {
+  if (val) {
+    moveHandler = (e) => props.onCanvasMouseMove(e)
+    upHandler = (e) => props.onCanvasMouseUp(e)
+    window.addEventListener('mousemove', moveHandler)
+    window.addEventListener('mouseup', upHandler)
+  } else {
+    if (moveHandler) window.removeEventListener('mousemove', moveHandler)
+    if (upHandler) window.removeEventListener('mouseup', upHandler)
+  }
+})
+onBeforeUnmount(() => {
+  if (moveHandler) window.removeEventListener('mousemove', moveHandler)
+  if (upHandler) window.removeEventListener('mouseup', upHandler)
+})
+defineEmits(['update:inlineEditValue'])
+</script>
+<style>
+@import '../assets/common.css';
+</style> 

@@ -1,0 +1,468 @@
+.keynote-bg {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #e9e9f3 0%, #f7fafd 100%);
+  font-family: 'San Francisco', 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif;
+  padding: 0;
+}
+.keynote-flex {
+  display: flex;
+  flex-direction: row;
+  min-height: 100vh;
+}
+.slide-list-menu {
+  width: 220px;
+  background: #f4f6fa;
+  border-right: 1.5px solid #e0e0e0;
+  box-shadow: 2px 0 12px #0001;
+  padding: 0 0 24px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.slide-list-title {
+  font-size: 1.1em;
+  font-weight: 700;
+  color: #007aff;
+  padding: 24px 0 12px 0;
+  text-align: center;
+  letter-spacing: 0.02em;
+  border-bottom: 1.5px solid #e0e0e0;
+  margin-bottom: 8px;
+}
+.slide-list-menu ul {
+  list-style: none;
+  padding: 0 0 0 0;
+  margin: 0;
+}
+.slide-list-menu li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 12px;
+  margin: 4px 8px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.slide-list-menu li.active {
+  background: linear-gradient(90deg, #e3f0ff 60%, #f7fafd 100%);
+  box-shadow: 0 2px 8px #007aff22;
+}
+.slide-list-menu li:hover {
+  background: #e9f3ff;
+}
+.slide-thumb {
+  width: 44px;
+  height: 28px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px #0001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.slide-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.slide-thumb-placeholder {
+  font-size: 0.7em;
+  color: #bbb;
+  text-align: center;
+}
+.slide-thumb-text {
+  font-size: 0.95em;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.keynote-main {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 0 0 40px 0;
+}
+.add-bar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 720px;
+  margin: 36px auto 0 auto;
+  padding: 0 0 18px 0;
+}
+.add-bar input {
+  flex: 1 1 0%;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1.1em;
+  background: #f7fafd;
+  transition: border 0.2s, box-shadow 0.2s;
+  outline: none;
+  box-shadow: 0 1px 4px #007aff11;
+}
+.add-bar input:focus {
+  border: 1.5px solid #007aff;
+  box-shadow: 0 2px 8px #007aff22;
+}
+.add-bar button {
+  padding: 10px 22px;
+  font-size: 1.1em;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #007aff 60%, #4fc3f7 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px #007aff22;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+.add-bar button:hover:not(:disabled) {
+  background: linear-gradient(90deg, #0051a8 60%, #0099ff 100%);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 4px 16px #007aff33;
+}
+.add-bar button:disabled {
+  background: #d1d5db;
+  color: #888;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 既存のKeynote風スタイルはそのまま */
+.slideshow.keynote-slide {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto 32px auto;
+  padding: 0;
+  border-radius: 32px;
+  background: #fff;
+  box-shadow: 0 8px 32px #0002, 0 1.5px 6px #0001;
+  text-align: center;
+  position: relative;
+  transition: box-shadow 0.2s;
+  aspect-ratio: 16 / 9;
+  min-height: 405px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.slide-content {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  padding: 32px 32px 0 32px;
+  box-sizing: border-box;
+}
+.slide-image {
+  max-width: 100%;
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  border-radius: 18px;
+  margin-bottom: 24px;
+  object-fit: contain;
+  display: block;
+}
+.slide-text {
+  font-size: 2em;
+  font-weight: 600;
+  color: #222;
+  margin-bottom: 24px;
+  letter-spacing: 0.01em;
+  text-align: center;
+  width: 100%;
+}
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 0;
+}
+.controls button {
+  padding: 12px 32px;
+  font-size: 1.1em;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #007aff 60%, #4fc3f7 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px #007aff22;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+.controls button:hover:not(:disabled) {
+  background: linear-gradient(90deg, #0051a8 60%, #0099ff 100%);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 4px 16px #007aff33;
+}
+.controls button:disabled {
+  background: #d1d5db;
+  color: #888;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.controls span {
+  font-size: 1.1em;
+  color: #555;
+  font-weight: 500;
+}
+
+.panel-row {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+.keynote-panel {
+  min-width: 280px;
+  max-width: 340px;
+  flex: 1 1 320px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 2px 12px #0001;
+  padding: 28px 24px 20px 24px;
+  margin: 0 0 24px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.keynote-panel h3 {
+  margin-top: 0;
+  margin-bottom: 18px;
+  font-size: 1.2em;
+  color: #007aff;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+label {
+  display: block;
+  margin-bottom: 18px;
+  font-size: 1em;
+  color: #333;
+  font-weight: 500;
+}
+input {
+  width: 100%;
+  padding: 10px 14px;
+  margin-top: 6px;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1.1em;
+  background: #f7fafd;
+  transition: border 0.2s, box-shadow 0.2s;
+  outline: none;
+  box-shadow: 0 1px 4px #007aff11;
+}
+input:focus {
+  border: 1.5px solid #007aff;
+  box-shadow: 0 2px 8px #007aff22;
+}
+.keynote-panel button {
+  margin-top: 8px;
+  padding: 10px 0;
+  font-size: 1.1em;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(90deg, #007aff 60%, #4fc3f7 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px #007aff22;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+}
+.keynote-panel button:hover:not(:disabled) {
+  background: linear-gradient(90deg, #0051a8 60%, #0099ff 100%);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 4px 16px #007aff33;
+}
+.keynote-panel button:disabled {
+  background: #d1d5db;
+  color: #888;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.slide-canvas {
+  position: relative;
+  overflow: hidden;
+}
+.slide-el {
+  transition: box-shadow 0.15s, border 0.15s;
+}
+.slide-el.selected {
+  border: 2px solid #007aff !important;
+  z-index: 20;
+}
+.slide-el-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.slide-el-text {
+  width: 100%;
+  height: 100%;
+  font-size: 1.2em;
+  font-weight: 600;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+.slide-el-text-input {
+  width: 100%;
+  height: 100%;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  text-align: center;
+  border: 2px solid #007aff;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.left-edit-panel {
+  margin: 24px 12px 0 12px;
+  box-shadow: 0 2px 12px #007aff11;
+  background: #fafdff;
+}
+
+.keynote-main.main-flex {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+  padding: 0 0 40px 0;
+}
+.main-center {
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.right-edit-panel {
+  min-width: 260px;
+  max-width: 340px;
+  margin: 36px 24px 0 24px;
+  box-shadow: 0 2px 12px #007aff11;
+  background: #fafdff;
+  align-self: flex-start;
+}
+
+.resize-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border: 2px solid #007aff;
+  border-radius: 50%;
+  z-index: 30;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.handle-nw { left: -7px; top: -7px; cursor: nwse-resize; }
+.handle-ne { right: -7px; top: -7px; cursor: nesw-resize; }
+.handle-sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
+.handle-se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.handle-n { left: 50%; top: -7px; transform: translateX(-50%); cursor: ns-resize; }
+.handle-e { right: -7px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.handle-s { left: 50%; bottom: -7px; transform: translateX(-50%); cursor: ns-resize; }
+.handle-w { left: -7px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.slide-el.selected { z-index: 20; }
+
+@media (max-width: 900px) {
+  .keynote-flex {
+    flex-direction: column;
+  }
+  .slide-list-menu {
+    width: 100vw;
+    border-right: none;
+    border-bottom: 1.5px solid #e0e0e0;
+    flex-direction: row;
+    overflow-x: auto;
+    min-height: 120px;
+    max-height: none;
+    overflow-y: visible;
+  }
+  .slide-list-title {
+    display: none;
+  }
+  .slide-list-menu ul {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    width: 100vw;
+    overflow-x: auto;
+  }
+  .slide-list-menu li {
+    min-width: 120px;
+    margin: 8px 4px;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 4px;
+  }
+  .slide-thumb {
+    width: 44px;
+    height: 28px;
+  }
+  .keynote-main {
+    padding: 0 0 40px 0;
+  }
+  .add-bar {
+    max-width: 98vw;
+    flex-direction: column;
+    gap: 8px;
+    margin: 16px auto 0 auto;
+    padding: 0 0 8px 0;
+  }
+  .slideshow.keynote-slide {
+    max-width: 98vw;
+    padding: 24px 4vw 18px 4vw;
+  }
+  .left-edit-panel {
+    min-width: 220px;
+    max-width: 320px;
+    margin: 8px 8px 0 8px;
+  }
+  .keynote-main.main-flex {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .main-center {
+    width: 100%;
+  }
+  .right-edit-panel {
+    min-width: 0;
+    max-width: 100vw;
+    margin: 16px 8px 0 8px;
+  }
+} 
