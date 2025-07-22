@@ -53,11 +53,11 @@ npm run dev
 ## 🏗️ ビルド & デプロイ
 
 ```bash
-npm run build
-npm run preview
+pnpm run build
+pnpm run preview
 ```
 
-本番ビルド後、`npm run preview` で最終確認できます。
+本番ビルド後、`pnpm run preview` で最終確認できます。
 
 ---
 
