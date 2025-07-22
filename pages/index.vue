@@ -58,7 +58,10 @@
                 pointerEvents: 'none',
               }"></div>
               <div class="canvas-zoom-wrapper">
-                <div :style="zoom.value < 1 ? { transform: `scale(${zoom.value})`, transformOrigin: 'top left', width: baseWidth + 'px', height: baseHeight + 'px' } : { width: baseWidth + 'px', height: baseHeight + 'px' }">
+                <div
+                  class="main-slide-container"
+                  :style="{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom.value})`, transformOrigin: '0 0' }"
+                >
                   <SlideCanvas
                     :elements="slides[current].elements"
                     :selectedElements="selectedElements"
@@ -149,6 +152,8 @@
   import SlideListMenu from '../components/SlideListMenu.vue'
   import SlideCanvas from '../components/SlideCanvas.vue'
   import ElementEditPanel from '../components/ElementEditPanel.vue'
+  import * as idb from '../utils/idb.js'
+  import { toRaw } from 'vue'
   
   // スライドショー用のダミー関数
   const alwaysFalse = () => false;
@@ -228,6 +233,7 @@
     selectedElements.value = []
   }
   const canvasWrapper = ref(null)
+  const pan = ref({ x: 0, y: 0 })
   
   // 画面いっぱいの16:9キャンバスサイズ計算
   const canvasWidth = ref(1280)
@@ -274,50 +280,41 @@
   const slidesTitle = ref('')
   const slidesMeta = ref({})
 
-  function loadSlidesList() {
-    // localStorageからmySlides_で始まる全てのスライドを列挙
-    const list = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('mySlides_')) {
-        try {
-          const data = JSON.parse(localStorage.getItem(key))
-          // タイトル・日付はデータ内に無ければ仮で
-          let title = '無題スライド', date = ''
-          if (Array.isArray(data) && data.length > 0 && data[0].meta) {
-            title = data[0].meta.title || title
-            date = data[0].meta.date || ''
-          }
-          list.push({
-            id: key.replace('mySlides_', ''),
-            title,
-            date
-          })
-        } catch {}
+  async function loadSlidesList() {
+    const allSlides = await idb.getAll();
+    const list = allSlides.map(item => {
+      const data = item.value;
+      let title = '無題スライド', date = '';
+      if (Array.isArray(data) && data.length > 0 && data[0].meta) {
+        title = data[0].meta.title || title;
+        date = data[0].meta.date || '';
       }
-    }
-    slidesList.value = list
+      return { id: item.id, title, date };
+    });
+    slidesList.value = list;
   }
+
   function saveSlidesList() {
-    localStorage.setItem('mySlidesList', JSON.stringify(slidesList.value))
+    // This function becomes obsolete as we load the list from the DB directly.
+    // We can keep it empty or remove its usages.
   }
-  function goHome() {
+  async function goHome() {
     isHome.value = true
-    loadSlidesList()
+    await loadSlidesList()
   }
-  function openSlidesById(id) {
-    const data = localStorage.getItem('mySlides_' + id)
+  async function openSlidesById(id) {
+    const data = await idb.get(id);
     if (data) {
-      openSlides(data)
-      const meta = slidesList.value.find(s => s.id === id)
-      if (meta) setSlidesMeta(meta)
-      isHome.value = false
+      openSlides(JSON.stringify(data));
+      const meta = slidesList.value.find(s => s.id === id);
+      if (meta) setSlidesMeta(meta);
+      isHome.value = false;
     }
   }
-  function deleteSlidesById(id) {
+  async function deleteSlidesById(id) {
     if (!confirm('本当に削除しますか？')) return
-    localStorage.removeItem('mySlides_' + id)
-    loadSlidesList()
+    await idb.remove(id);
+    await loadSlidesList();
   }
   function newSlidesWithTitle() {
     slides.value = [{ elements: [] }]
@@ -332,26 +329,26 @@
     slides.value[0].meta.title = title;
     slides.value[0].meta.date = date;
   }
-  function saveSlidesAsNew() {
+  async function saveSlidesAsNew() {
     const id = Date.now().toString();
     const title = slidesTitle.value || '無題スライド';
     const date = new Date().toLocaleString();
     updateSlidesMeta(title, date);
-    localStorage.setItem('mySlides_' + id, JSON.stringify(slides.value));
-    loadSlidesList();
+    await idb.set(id, toRaw(slides.value));
+    await loadSlidesList();
     setSlidesMeta({ id, title, date });
     alert('新しいスライドとして保存しました');
   }
-  function saveCurrentSlides() {
+  async function saveCurrentSlides() {
     if (!slidesMeta.value.id) {
-      saveSlidesAsNew();
+      await saveSlidesAsNew();
     } else {
       const id = slidesMeta.value.id;
       const title = slidesMeta.value.title || '無題スライド';
       const date = new Date().toLocaleString();
       updateSlidesMeta(title, date);
-      localStorage.setItem('mySlides_' + id, JSON.stringify(slides.value));
-      loadSlidesList();
+      await idb.set(id, toRaw(slides.value));
+      await loadSlidesList();
       setSlidesMeta({ id, title, date });
       alert('保存しました');
     }
@@ -360,12 +357,12 @@
     slidesMeta.value = meta
     slidesTitle.value = meta.title
   }
-  onMounted(() => {
-    loadSlidesList();
+  onMounted(async () => {
+    await loadSlidesList();
     window.addEventListener('keydown', handleKeydown)
     window.addEventListener('keydown', handleSlideshowKey)
     // サイトを開いた時点でローカルデータ自動読込
-    localLoad()
+    // localLoad() // localLoad is now obsolete with IndexedDB, starting with a blank slate or the last opened slide might be better.
     updateCanvasSize()
     window.addEventListener('resize', updateCanvasSize)
     if (canvasWrapper.value) {
@@ -377,7 +374,8 @@
   })
   onBeforeUnmount(() => {
     window.removeEventListener('resize', updateCanvasSize)
-    window.removeEventListener('resize', updateSlideshowScale)
+    window.removeEventListener('keydown', handleKeydown)
+    window.removeEventListener('keydown', handleSlideshowKey)
     if (canvasWrapper.value) {
       canvasWrapper.value.removeEventListener('wheel', onWheel)
       canvasWrapper.value.removeEventListener('touchstart', onTouchStart)
@@ -395,18 +393,34 @@
   const minZoom = 0.2;
   const maxZoom = 2;
   const zoom = ref(1)
-  function setZoom(val) {
-    console.log(val);
-    if (typeof val !== 'number' || isNaN(val) || !isFinite(val)) {
-      zoom.value = 1;
+  function setZoom(val, center) {
+    const newZoom = Math.max(minZoom, Math.min(maxZoom, val));
+    const oldZoom = zoom.value;
+    if (center) {
+      // centerはビューポート基準の座標（canvasWrapperの左上からの相対位置）
+      pan.value.x = center.x - ((center.x - pan.value.x) * newZoom) / oldZoom;
+      pan.value.y = center.y - ((center.y - pan.value.y) * newZoom) / oldZoom;
     } else {
-      zoom.value = Math.max(minZoom, Math.min(maxZoom, Math.round(val * 100) / 100));
+      // ズームの中心が指定されていない場合は、現在のビューの中心を基準にする
+      const rect = canvasWrapper.value.getBoundingClientRect();
+      const viewCenter = { x: rect.width / 2, y: rect.height / 2 };
+      pan.value.x = viewCenter.x - ((viewCenter.x - pan.value.x) * newZoom) / oldZoom;
+      pan.value.y = viewCenter.y - ((viewCenter.y - pan.value.y) * newZoom) / oldZoom;
     }
+    zoom.value = newZoom;
   }
-  function zoomIn() { setZoom(zoom.value + 0.1) }
-  function zoomOut() { setZoom(zoom.value - 0.1) }
-  function resetZoom() { setZoom(1) }
+  function zoomIn() {
+    setZoom(zoom.value + 0.1);
+  }
+  function zoomOut() {
+    setZoom(zoom.value - 0.1);
+  }
+  function resetZoom() {
+    pan.value = { x: 0, y: 0 };
+    setZoom(1);
+  }
   let lastTouchDist = null
+  let lastTouchCenter = null
   function getTouchDist(e) {
     if (e.touches.length < 2) return 0
     const dx = e.touches[0].clientX - e.touches[1].clientX
@@ -419,25 +433,49 @@
     const isPinch = e.ctrlKey || (isMac && Math.abs(e.deltaY) < 15 && e.deltaMode === 0);
     if (isPinch) {
       e.preventDefault();
-      setZoom(zoom.value - e.deltaY * 0.01);
+      const rect = canvasWrapper.value.getBoundingClientRect();
+      const center = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const newZoom = zoom.value - e.deltaY * 0.01;
+      setZoom(newZoom, center);
+    } else {
+      e.preventDefault();
+      pan.value.x -= e.deltaX;
+      pan.value.y -= e.deltaY;
     }
   }
   function onTouchStart(e) {
     if (e.touches.length === 2) {
+      e.preventDefault()
       lastTouchDist = getTouchDist(e)
+      lastTouchCenter = getTouchCenter(e)
+    } else if (e.touches.length === 1) {
+      e.preventDefault();
+      lastTouchCenter = getTouchCenter(e);
     }
   }
   function onTouchMove(e) {
     if (e.touches.length === 2 && lastTouchDist) {
+      e.preventDefault()
       const dist = getTouchDist(e)
       const scale = dist / lastTouchDist
-      setZoom(zoom.value * scale)
+      const rect = canvasWrapper.value.getBoundingClientRect();
+      const center = getTouchCenter(e);
+      const relativeCenter = { x: center.clientX - rect.left, y: center.clientY - rect.top };
+      setZoom(zoom.value * scale, relativeCenter)
       lastTouchDist = dist
+      lastTouchCenter = center; // 2本指でもcenterを更新
+    } else if (e.touches.length === 1 && lastTouchCenter) {
+      // 1本指パン
       e.preventDefault()
+      const center = getTouchCenter(e);
+      pan.value.x += center.clientX - lastTouchCenter.clientX;
+      pan.value.y += center.clientY - lastTouchCenter.clientY;
+      lastTouchCenter = center;
     }
   }
   function onTouchEnd(e) {
     if (e.touches.length < 2) lastTouchDist = null
+    if (e.touches.length < 1) lastTouchCenter = null
   }
   // --- ここまでズーム機能 ---
   
@@ -515,8 +553,8 @@
   }
   function onDrag(e) {
     if (!dragInfo) return
-    const dx = e.clientX - dragInfo.startX
-    const dy = e.clientY - dragInfo.startY
+    const dx = (e.clientX - dragInfo.startX) / zoom.value
+    const dy = (e.clientY - dragInfo.startY) / zoom.value
     const el = slides.value[current.value].elements[dragInfo.idx]
     el.x = Math.max(0, dragInfo.origX + dx)
     el.y = Math.max(0, dragInfo.origY + dy)
@@ -557,8 +595,8 @@
   function onResize(e) {
     if (!resizeInfo) return
     pushHistory()
-    const dx = e.clientX - resizeInfo.startX
-    const dy = e.clientY - resizeInfo.startY
+    const dx = (e.clientX - resizeInfo.startX) / zoom.value
+    const dy = (e.clientY - resizeInfo.startY) / zoom.value
     const el = slides.value[current.value].elements[resizeInfo.idx]
     let { origX, origY, origW, origH, dir } = resizeInfo
   
@@ -633,11 +671,11 @@
   const dragRect = ref({x:0, y:0, w:0, h:0})
   let dragStart = null
   function getCanvasOffset(e) {
-    const rect = canvasWrapper.value.getBoundingClientRect()
-    return {
-      x: (e.clientX - rect.left) / zoom.value,
-      y: (e.clientY - rect.top) / zoom.value
-    }
+    const wrapperRect = canvasWrapper.value.getBoundingClientRect();
+    const slideRect = canvasWrapper.value.querySelector('.main-slide-container').getBoundingClientRect();
+    const x = (e.clientX - slideRect.left) / zoom.value;
+    const y = (e.clientY - slideRect.top) / zoom.value;
+    return { x, y };
   }
   function onCanvasMouseDown(e) {
     if (e.button !== 0) return
@@ -833,7 +871,7 @@
     selectedElements.value = []
   }
   // スライド保存
-  function saveSlides() {
+  async function saveSlides() {
     const data = JSON.stringify(slides.value, null, 2)
     const blob = new Blob([data], {type: 'application/json'})
     const url = URL.createObjectURL(blob)
@@ -872,37 +910,48 @@
     autoLocalSave()
   }
   // ローカル保存
-  function localSave() {
+  async function localSave() {
     try {
       const id = slidesMeta.value.id || Date.now().toString();
       const title = slidesMeta.value.title || slidesTitle.value || '無題スライド';
       const date = new Date().toLocaleString();
       updateSlidesMeta(title, date);
-      localStorage.setItem('mySlides_' + id, JSON.stringify(slides.value));
-      loadSlidesList();
+      await idb.set(id, toRaw(slides.value));
+      
+      // slidesListの更新も行う
+      const existing = slidesList.value.find(s => s.id === id);
+      if (existing) {
+        existing.title = title;
+        existing.date = date;
+      } else {
+        slidesList.value.push({ id, title, date });
+      }
+
       setSlidesMeta({ id, title, date });
       // alert('ローカル保存しました')
     } catch(e) {
       console.error('ローカル保存に失敗しました',e);
     }
   }
-  // ローカル読込
-  function localLoad() {
-    const saved = localStorage.getItem('mySlides')
-    if (saved) {
-      try {
-        const arr = JSON.parse(saved)
-        if (Array.isArray(arr) && arr.every(s => s.elements)) {
-          slides.value = arr
-          current.value = 0
-          selectedElements.value = []
-        } else {
-          alert('ローカルデータが不正です')
-        }
-      } catch {
-        alert('ローカルデータの読込に失敗しました')
-      }
-    }
+  // ローカル読込 (This function might be deprecated or changed)
+  async function localLoad() {
+    // For now, this function is not directly used as we load the list on mount.
+    // If you need to load a specific "last-opened" slide, this logic would change.
+    // const saved = await idb.get('mySlides'); // Example of getting a specific item
+    // if (saved) {
+    //   try {
+    //     const arr = saved; // No need to parse, it's already an object
+    //     if (Array.isArray(arr) && arr.every(s => s.elements)) {
+    //       slides.value = arr
+    //       current.value = 0
+    //       selectedElements.value = []
+    //     } else {
+    //       alert('ローカルデータが不正です')
+    //     }
+    //   } catch {
+    //     alert('ローカルデータの読込に失敗しました')
+    //   }
+    // }
   }
   
   const baseWidth = 1280;
@@ -970,11 +1019,11 @@
     reader.readAsText(file)
     e.target.value = ''
   }
-  function getSlideThumb(id) {
-    const data = localStorage.getItem('mySlides_' + id)
+  async function getSlideThumb(id) {
+    const data = await idb.get(id);
     if (!data) return {}
     try {
-      const slidesArr = JSON.parse(data)
+      const slidesArr = data;
       if (Array.isArray(slidesArr) && slidesArr.length > 0) {
         const first = slidesArr[0].elements && slidesArr[0].elements[0]
         if (first) return first
@@ -1061,9 +1110,15 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    width: 100vw;
-    height: 100vh;
-    overflow: auto;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
+  .main-slide-container {
+    width: 1280px;
+    height: 720px;
+    position: relative;
+    background: white;
   }
   .slideshow-overlay {
     position: fixed;
