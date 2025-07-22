@@ -86,16 +86,18 @@
                     :canvasWidth="baseWidth"
                     :canvasHeight="baseHeight"
                     :zoom="zoom.value"
+                    :background="slides[current].background || '#ffffff'"
                   />
                 </div>
               </div>
             </div>
-            <div v-if="selectedElements.length" style="position: fixed; top: 32px; right: 32px; z-index: 4000;">
+            <div v-if="selectedElements.length || true" style="position: fixed; top: 32px; right: 32px; z-index: 4000;">
               <ElementEditPanel
-                v-if="selectedElements.length"
                 :currentEls="currentEls"
                 @removeElement="removeElement"
                 @moveElementZ="moveElementZ"
+                :slideBackground="slides[current].background || '#ffffff'"
+                @update:slideBackground="val => { slides[current].background = val; autoLocalSave(); }"
               />
             </div>
           </div>
@@ -114,6 +116,7 @@
               :elementStyle="elementStyle"
               :textElementStyle="textElementStyle"
               :isEditingText="alwaysFalse"
+              :background="slides[current].background || '#ffffff'"
             />
           </div>
           <button class="slideshow-exit-btn" @click="endSlideshow">終了</button>
