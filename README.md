@@ -15,13 +15,13 @@
 ### 1. 依存パッケージのインストール
 
 ```bash
-npm install # または yarn install / pnpm install / bun install
+pnpm install
 ```
 
 ### 2. 開発サーバー起動
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 ブラウザで [http://localhost:3000](http://localhost:3000) を開いて編集スタート！
