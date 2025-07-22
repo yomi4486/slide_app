@@ -1,75 +1,77 @@
-# Nuxt Minimal Starter
+# 🚀 Slide App - 直感的スライド作成ツール
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+ようこそ！**Slide App** は、画像やテキストを自由に配置して、直感的にスライド資料を作成できるWebアプリです。
 
-## Setup
+- 🖱️ **ドラッグ&ドロップ** で要素を自由に配置
+- 🖼️ 画像・テキスト・図形をワンクリックで追加
+- 🔍 **ズーム・パン** で細かい編集もラクラク
+- 💾 **自動保存 & IndexedDB対応** で大容量データも安心
+- 🎉 **スライドショー** 機能でそのまま発表もOK
 
-Make sure to install dependencies:
+---
+
+## 🚗 クイックスタート
+
+### 1. 依存パッケージのインストール
 
 ```bash
-# npm
-npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
+npm install # または yarn install / pnpm install / bun install
 ```
 
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+### 2. 開発サーバー起動
 
 ```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+ブラウザで [http://localhost:3000](http://localhost:3000) を開いて編集スタート！
 
-Build the application for production:
+---
+
+## 🛠️ 主な機能
+
+- **スライドの新規作成・保存・削除**
+- **画像・テキスト・図形の追加・編集・移動・リサイズ**
+- **複数要素の選択・一括操作**
+- **Undo/Redo（やり直し/戻す）**
+- **ズーム・パン（スクロールやピンチで拡大縮小＆移動）**
+- **スライドショー再生**
+- **ローカル保存（IndexedDB）で大容量もOK**
+- **JSONファイルでエクスポート/インポート**
+
+---
+
+## 💡 使い方のヒント
+
+- **画像はドラッグ&ドロップでも追加可能！**
+- **要素を複数選択して一括移動や削除もできる！**
+- **自動保存ONで編集内容をしっかりキープ！**
+- **スライド名を変えても同じIDで上書き保存されるから安心！**
+
+---
+
+## 🏗️ ビルド & デプロイ
 
 ```bash
-# npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
 npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+本番ビルド後、`npm run preview` で最終確認できます。
+
+---
+
+## 📚 もっと知りたい？
+
+- [Nuxt公式ドキュメント](https://nuxt.com/docs/getting-started/introduction)
+- [デプロイ方法](https://nuxt.com/docs/getting-started/deployment)
+
+---
+
+## 🧑‍💻 開発・コントリビュート大歓迎！
+
+バグ報告・機能要望・プルリクエスト、なんでもお待ちしています！
+
+---
+
+Enjoy Slide App! 🚀
