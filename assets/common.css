@@ -423,7 +423,7 @@ input:focus {
 .canvas-zoom-ui {
   position: fixed;
   right: 32px;
-  bottom: 32px;
+  bottom: 6px;
   z-index: 9999;
   display: flex;
   gap: 8px;

@@ -93,15 +93,22 @@ const props = defineProps([
   'zoom',
   'slideshow', // 追加
 ])
-const canvasStyle = computed(() => ({
-  width: props.canvasWidth + 'px',
-  height: props.canvasHeight + 'px',
-  position: 'absolute',
-  left: props.canvasLeft + 'px',
-  top: props.canvasTop + 'px',
-  minWidth: 0,
-  minHeight: 0
-}))
+const canvasStyle = computed(() => {
+  const style = {
+    width: props.canvasWidth + 'px',
+    height: props.canvasHeight + 'px',
+    minWidth: 0,
+    minHeight: 0,
+    position: 'relative',
+    overflow: 'hidden',
+    background: '#fff',
+    borderRadius: props.slideshow ? '0' : '32px',
+    boxShadow: props.slideshow ? 'none' : '0 8px 32px #0002, 0 1.5px 6px #0001',
+  }
+  if (props.canvasLeft !== undefined) style.left = props.canvasLeft + 'px'
+  if (props.canvasTop !== undefined) style.top = props.canvasTop + 'px'
+  return style
+})
 // ドラッグ選択のmousemove/upイベントを動的に付け外し
 let moveHandler = null
 let upHandler = null

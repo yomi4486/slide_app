@@ -31,22 +31,8 @@
         <div class="app-bar-actions">
           <button class="app-bar-btn" @click="goHome">🏠 ホームに戻る</button>
           <input class="slide-title-input" v-model="slidesTitle" @input="onTitleInput" placeholder="スライド名を入力" />
-          <button class="app-bar-btn" @click="addElement('image')">＋URLから画像を追加</button>
-          <button class="app-bar-btn" @click="addLocalImage">＋画像を挿入</button>
-          <input type="file" ref="localImageInput" accept="image/*" style="display:none" @change="onLocalImageChange" />
-          <button class="app-bar-btn" @click="addElement('text')">＋テキスト追加</button>
-          <button class="app-bar-btn" @click="addElement('rect')">＋四角形追加</button>
           <button class="app-bar-btn" @click="saveCurrentSlides">書き出し</button>
           <button class="app-bar-btn" @click="newSlides">新規</button>
-          <button class="app-bar-btn" @click="localSave">ローカル保存</button>
-          <button class="app-bar-btn" @click="startSlideshow">▶スライドショー</button>
-          <label class="autosave-toggle">
-            <span>自動保存</span>
-            <span class="ios-switch">
-              <input type="checkbox" v-model="autoSave" />
-              <span class="slider"></span>
-            </span>
-          </label>
         </div>
       </header>
       <SlideListMenu :slides="slides" :current="current" @goTo="goTo" @addSlide="addSlide" />
@@ -99,12 +85,6 @@
                     :zoom="zoom.value"
                   />
                 </div>
-                <div class="canvas-zoom-ui">
-                  <button @click="zoomOut" :disabled="Number(zoom.value) <= minZoom">−</button>
-                  <span>{{ isNaN(zoom.value) ? 100 : Math.round(zoom.value * 100) }}%</span>
-                  <button @click="zoomIn" :disabled="Number(zoom.value) >= maxZoom">＋</button>
-                  <button @click="resetZoom" :disabled="zoom.value === 1">100%</button>
-                </div>
               </div>
             </div>
             <div v-if="selectedElements.length" style="position: fixed; top: 32px; right: 32px; z-index: 4000;">
@@ -118,6 +98,50 @@
           </div>
         </div>
       </main>
+      <!-- Slideshow Overlay -->
+      <div v-if="isSlideshow" class="slideshow-overlay">
+        <div class="slideshow-canvas-wrapper">
+          <div class="slideshow-canvas-scaler" :style="{ width: baseWidth + 'px', height: baseHeight + 'px', transform: `scale(${slideshowScale.value})`, transformOrigin: 'center center' }">
+            <SlideCanvas
+              :elements="slides[current].elements"
+              :selectedElements="[]"
+              :canvasWidth="baseWidth"
+              :canvasHeight="baseHeight"
+              :zoom="1"
+              :elementStyle="elementStyle"
+              :textElementStyle="textElementStyle"
+              :isEditingText="alwaysFalse"
+            />
+          </div>
+          <button class="slideshow-exit-btn" @click="endSlideshow">終了</button>
+          <button class="slideshow-prev-btn" @click="current > 0 && (current.value--)" :disabled="current === 0">‹</button>
+          <button class="slideshow-next-btn" @click="current < slides.length - 1 && (current.value++)" :disabled="current === slides.length - 1">›</button>
+          <div class="slideshow-page">{{ current + 1 }} / {{ slides.length }}</div>
+        </div>
+      </div>
+      <!-- Bottom Bar -->
+      <footer class="bottom-bar">
+        <button class="bottom-bar-btn" @click="addElement('image')">＋URLから画像を追加</button>
+        <button class="bottom-bar-btn" @click="addLocalImage">＋画像を挿入</button>
+        <input type="file" ref="localImageInput" accept="image/*" style="display:none" @change="onLocalImageChange" />
+        <button class="bottom-bar-btn" @click="addElement('text')">＋テキスト追加</button>
+        <button class="bottom-bar-btn" @click="addElement('rect')">＋四角形追加</button>
+        <div class="canvas-zoom-ui">
+          <button @click="zoomOut" :disabled="Number(zoom.value) <= minZoom">−</button>
+          <span>{{ isNaN(zoom.value) ? 100 : Math.round(zoom.value * 100) }}%</span>
+          <button @click="zoomIn" :disabled="Number(zoom.value) >= maxZoom">＋</button>
+          <button @click="resetZoom" :disabled="zoom.value === 1">100%</button>
+        </div>
+        <button class="bottom-bar-btn" @click="startSlideshow">▶スライドショー</button>
+        <button class="bottom-bar-btn" @click="localSave">ローカル保存</button>
+        <label class="autosave-toggle bottom-autosave">
+          <span>自動保存</span>
+          <span class="ios-switch">
+            <input type="checkbox" v-model="autoSave" />
+            <span class="slider"></span>
+          </span>
+        </label>
+      </footer>
     </div>
   </template>
   <script setup>
@@ -126,6 +150,22 @@
   import SlideCanvas from '../components/SlideCanvas.vue'
   import ElementEditPanel from '../components/ElementEditPanel.vue'
   
+  // スライドショー用のダミー関数
+  const alwaysFalse = () => false;
+  // スライドショー用のウィンドウサイズreactive
+  const windowWidth = ref(0)
+  const windowHeight = ref(0)
+  function updateWindowSize() {
+    windowWidth.value = window.innerWidth
+    windowHeight.value = window.innerHeight
+  }
+  onMounted(() => {
+    updateWindowSize()
+    window.addEventListener('resize', updateWindowSize)
+  })
+  onBeforeUnmount(() => {
+    window.removeEventListener('resize', updateWindowSize)
+  })
   // 新しいスライドデータ構造
   const slides = ref([
     {
@@ -201,24 +241,23 @@
     canvasHeight.value = Math.floor(ch);
   }
   const isSlideshow = ref(false)
-  const slideshowScale = ref(1)
-
-  function updateSlideshowScale() {
-    const w = window.innerWidth
-    const h = window.innerHeight
-    slideshowScale.value = Math.min(w / baseWidth, h / baseHeight)
-  }
-
+  // 新しいslideshowScale定義
+  const slideshowScale = computed(() => {
+    return Math.min(windowWidth.value / baseWidth, windowHeight.value / baseHeight)
+  })
+  watch(slideshowScale, (val) => {
+    console.log('slideshowScale changed:', val);
+  });
   function startSlideshow() {
-    isSlideshow.value = true
-    document.body.style.overflow = 'hidden'
-    updateSlideshowScale()
-    window.addEventListener('resize', updateSlideshowScale)
+    updateWindowSize(); // 画面サイズを再計算
+    isSlideshow.value = true;
+    document.body.style.overflow = 'hidden';
   }
   function endSlideshow() {
-    isSlideshow.value = false
-    document.body.style.overflow = ''
-    window.removeEventListener('resize', updateSlideshowScale)
+    isSlideshow.value = false;
+    document.body.style.overflow = '';
+    isHome.value = false; // 編集画面に戻す
+    // current.value = 0; // ここは不要なので削除
   }
   function handleSlideshowKey(e) {
     if (!isSlideshow.value) return
@@ -346,6 +385,11 @@
       canvasWrapper.value.removeEventListener('touchend', onTouchEnd)
     }
   })
+  watch(isSlideshow, (val) => {
+    if (val) {
+      updateWindowSize();
+    }
+  });
   
   // --- ここからズーム機能 ---
   const minZoom = 0.2;
@@ -442,7 +486,7 @@
       el = { type: 'rect', x: 120, y: 120, width: 200, height: 120, background: '#1976d2', shadow: false }
     }
     slides.value[current.value].elements.push(el)
-    selectedElement.value = slides.value[current.value].elements.length - 1
+    selectedElements.value = [slides.value[current.value].elements.length - 1]
     autoLocalSave()
   }
   
@@ -838,8 +882,8 @@
       loadSlidesList();
       setSlidesMeta({ id, title, date });
       // alert('ローカル保存しました')
-    } catch {
-      console.error('ローカル保存に失敗しました');
+    } catch(e) {
+      console.error('ローカル保存に失敗しました',e);
     }
   }
   // ローカル読込
@@ -865,6 +909,8 @@
   
   const baseWidth = 1280;
   const baseHeight = 720;
+
+  // スライドショー用のscaleを計算
   
   function addSlide() {
     pushHistory()
@@ -1005,6 +1051,7 @@
   }
   .keynote-bg {
     padding-top: 56px;
+    padding-bottom: 72px; /* ボトムバー分の余白を追加 */
   }
   .keynote-main .main-center {
     display: flex;
@@ -1043,19 +1090,13 @@
     overflow: hidden;
   }
   .slideshow-canvas-scaler {
+    width: 1280px;
+    height: 720px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto;
-    /* 1280x720固定サイズをscaleで拡大 */
-    background: #fff;
-    border-radius: 0;
-    box-shadow: none;
-    transition: transform 0.2s;
   }
   .slideshow-canvas-wrapper > .slide-canvas {
-    width: 100vw !important;
-    height: 100vh !important;
     max-width: 100vw !important;
     max-height: 100vh !important;
     aspect-ratio: 16/9;
@@ -1287,6 +1328,76 @@
   .slide-title-input:focus {
     border: 1.5px solid #007aff;
     box-shadow: 0 2px 8px #007aff22;
+  }
+  /* Bottom Bar Styles */
+  .bottom-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 56px;
+    background: linear-gradient(90deg, #007aff 60%, #4fc3f7 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    z-index: 5000;
+    box-shadow: 0 -2px 8px #007aff22;
+    padding: 0 24px;
+  }
+  .bottom-bar-btn {
+    background: #fff;
+    color: #007aff;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 16px;
+    font-size: 1em;
+    font-weight: 600;
+    box-shadow: 0 1px 4px #007aff11;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .bottom-bar-btn:hover {
+    background: #e3f0ff;
+    color: #0051a8;
+  }
+  .bottom-bar .canvas-zoom-ui {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    box-shadow: none;
+    margin: 0 12px;
+  }
+  .bottom-bar .canvas-zoom-ui button {
+    background: #fff;
+    color: #007aff;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .bottom-bar .canvas-zoom-ui button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .bottom-bar .canvas-zoom-ui span {
+    color: #fff;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: center;
+  }
+  .bottom-autosave {
+    color: #fff;
+    margin-left: 16px;
+    font-size: 1em;
+    font-weight: 600;
+    user-select: none;
+    height: 100%;
   }
   </style>
   
