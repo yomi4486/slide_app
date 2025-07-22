@@ -354,8 +354,11 @@
     }
   }
   function setSlidesMeta(meta) {
-    slidesMeta.value = meta
-    slidesTitle.value = meta.title
+    // 既存IDがあればそれを優先
+    slidesMeta.value.id = slidesMeta.value.id || meta.id;
+    slidesMeta.value.title = meta.title;
+    slidesTitle.value = meta.title;
+    if (meta.date) slidesMeta.value.date = meta.date;
   }
   onMounted(async () => {
     await loadSlidesList();
@@ -912,12 +915,17 @@
   // ローカル保存
   async function localSave() {
     try {
-      const id = slidesMeta.value.id || Date.now().toString();
+      if (!slidesMeta.value.id) {
+        // 新規作成時のみID発行
+        await saveSlidesAsNew();
+        return;
+      }
+      const id = slidesMeta.value.id;
       const title = slidesMeta.value.title || slidesTitle.value || '無題スライド';
       const date = new Date().toLocaleString();
       updateSlidesMeta(title, date);
       await idb.set(id, toRaw(slides.value));
-      
+
       // slidesListの更新も行う
       const existing = slidesList.value.find(s => s.id === id);
       if (existing) {
