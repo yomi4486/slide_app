@@ -31,7 +31,7 @@
         <div class="app-bar-actions">
           <button class="app-bar-btn" @click="goHome">🏠 ホームに戻る</button>
           <input class="slide-title-input" v-model="slidesTitle" @input="onTitleInput" placeholder="スライド名を入力" />
-          <button class="app-bar-btn" @click="saveCurrentSlides">書き出し</button>
+          <button class="app-bar-btn" @click="saveSlides">書き出し</button>
           <button class="app-bar-btn" @click="newSlides">新規</button>
         </div>
       </header>
@@ -876,14 +876,14 @@
   function clearSelection() {
     selectedElements.value = []
   }
-  // スライド保存
-  async function saveSlides() {
-    const data = JSON.stringify(slides.value, null, 2)
+  // スライド保存（JSON書き出し）
+  function saveSlides() {
+    const data = JSON.stringify(toRaw(slides.value), null, 2)
     const blob = new Blob([data], {type: 'application/json'})
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'slides.json'
+    a.download = (slidesMeta.value.title || 'slides') + '.json'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
