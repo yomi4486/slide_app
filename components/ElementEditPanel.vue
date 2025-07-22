@@ -1,78 +1,100 @@
 <template>
   <div class="edit-section keynote-panel right-edit-panel modern-edit-panel">
-    <h3 class="edit-title">要素編集</h3>
-    <div class="edit-group" v-if="currentEl?.type === 'image'">
-      <label class="edit-label">画像URL</label>
-      <input v-model="currentEl.content" class="edit-input" />
-    </div>
-    <template v-if="currentEl?.type === 'text'">
-      <div class="edit-group">
-        <label class="edit-label">テキスト</label>
-        <textarea v-model="currentEl.content" class="edit-input" rows="2" style="resize:vertical; min-height:38px;"></textarea>
+    <template v-if="currentEl">
+      <h3 class="edit-title">要素編集</h3>
+      <!-- 既存の要素編集UI -->
+      <div class="edit-group" v-if="currentEl?.type === 'image'">
+        <label class="edit-label">画像URL</label>
+        <input v-model="currentEl.content" class="edit-input" />
       </div>
-      <div class="edit-row">
+      <template v-if="currentEl?.type === 'text'">
         <div class="edit-group">
-          <label class="edit-label">フォントサイズ</label>
-          <input type="number" v-model.number="currentEl.fontSize" min="8" max="120" class="edit-input short" />
+          <label class="edit-label">テキスト</label>
+          <textarea v-model="currentEl.content" class="edit-input" rows="2" style="resize:vertical; min-height:38px;"></textarea>
         </div>
-        <div class="edit-group color-group">
-          <label class="edit-label">色</label>
-          <div class="color-row">
-            <input type="color" v-model="currentEl.color" class="edit-color" />
-            <input v-model="currentEl.color" class="edit-input short" />
+        <div class="edit-row">
+          <div class="edit-group">
+            <label class="edit-label">フォントサイズ</label>
+            <input type="number" v-model.number="currentEl.fontSize" min="8" max="120" class="edit-input short" />
+          </div>
+          <div class="edit-group color-group">
+            <label class="edit-label">色</label>
+            <div class="color-row">
+              <input type="color" v-model="currentEl.color" class="edit-color" />
+              <input v-model="currentEl.color" class="edit-input short" />
+            </div>
           </div>
         </div>
+        <div class="edit-group">
+          <label class="edit-label">文字揃え</label>
+          <select v-model="currentEl.textAlign" class="edit-input short">
+            <option value="center">中央</option>
+            <option value="left">左</option>
+            <option value="right">右</option>
+          </select>
+        </div>
+      </template>
+      <template v-if="currentEl?.type === 'rect'">
+        <div class="edit-group color-group">
+          <label class="edit-label">塗りつぶし色</label>
+          <div class="color-row">
+            <input type="color" v-model="currentEl.background" class="edit-color" />
+            <input v-model="currentEl.background" class="edit-input short" />
+          </div>
+        </div>
+      </template>
+      <div class="edit-row">
+        <div class="edit-group">
+          <label class="edit-label">X</label>
+          <input type="number" v-model.number="currentEl.x" class="edit-input short" />
+        </div>
+        <div class="edit-group">
+          <label class="edit-label">Y</label>
+          <input type="number" v-model.number="currentEl.y" class="edit-input short" />
+        </div>
+        <div class="edit-group">
+          <label class="edit-label">幅</label>
+          <input type="number" v-model.number="currentEl.width" class="edit-input short" />
+        </div>
+        <div class="edit-group">
+          <label class="edit-label">高さ</label>
+          <input type="number" v-model.number="currentEl.height" class="edit-input short" />
+        </div>
       </div>
-      <div class="edit-group">
-        <label class="edit-label">文字揃え</label>
-        <select v-model="currentEl.textAlign" class="edit-input short">
-          <option value="center">中央</option>
-          <option value="left">左</option>
-          <option value="right">右</option>
-        </select>
-      </div>
-    </template>
-    <template v-if="currentEl?.type === 'rect'">
-      <div class="edit-group color-group">
-        <label class="edit-label">塗りつぶし色</label>
-        <div class="color-row">
-          <input type="color" v-model="currentEl.background" class="edit-color" />
-          <input v-model="currentEl.background" class="edit-input short" />
+      <div class="edit-actions">
+        <button class="edit-btn delete" @click="$emit('removeElement')">削除</button>
+        <div class="zorder-group">
+          <button class="edit-btn zorder" @click="$emit('moveElementZ', 'up')">⬆️ 前面へ</button>
+          <button class="edit-btn zorder" @click="$emit('moveElementZ', 'down')">⬇️ 背面へ</button>
         </div>
       </div>
     </template>
-    <div class="edit-row">
-      <div class="edit-group">
-        <label class="edit-label">X</label>
-        <input type="number" v-model.number="currentEl.x" class="edit-input short" />
+    <template v-else>
+      <h3 class="edit-title">スライド編集</h3>
+      <div class="edit-group color-group">
+        <label class="edit-label">背景色</label>
+        <div class="color-row">
+          <input type="color" v-model="slideBackgroundProxy" class="edit-color" />
+          <input v-model="slideBackgroundProxy" class="edit-input short" />
+        </div>
       </div>
-      <div class="edit-group">
-        <label class="edit-label">Y</label>
-        <input type="number" v-model.number="currentEl.y" class="edit-input short" />
-      </div>
-      <div class="edit-group">
-        <label class="edit-label">幅</label>
-        <input type="number" v-model.number="currentEl.width" class="edit-input short" />
-      </div>
-      <div class="edit-group">
-        <label class="edit-label">高さ</label>
-        <input type="number" v-model.number="currentEl.height" class="edit-input short" />
-      </div>
-    </div>
-    <div class="edit-actions">
-      <button class="edit-btn delete" @click="$emit('removeElement')">削除</button>
-      <div class="zorder-group">
-        <button class="edit-btn zorder" @click="$emit('moveElementZ', 'up')">⬆️ 前面へ</button>
-        <button class="edit-btn zorder" @click="$emit('moveElementZ', 'down')">⬇️ 背面へ</button>
-      </div>
-    </div>
+    </template>
   </div>
 </template>
 <script setup>
-import { computed } from 'vue'
-const props = defineProps(['currentEls'])
+import { computed, ref, watch } from 'vue'
+const props = defineProps(['currentEls', 'slideBackground'])
+const emit = defineEmits(['removeElement', 'moveElementZ', 'update:slideBackground'])
 const currentEl = computed(() => props.currentEls?.[0] || null)
-defineEmits(['removeElement'])
+
+// スライド背景色編集用の双方向バインディング
+const slideBackgroundProxy = ref(props.slideBackground || '#ffffff')
+watch(() => props.slideBackground, (val) => {
+  slideBackgroundProxy.value = val || '#ffffff'
+})
+watch(slideBackgroundProxy, (val) => {
+  emit('update:slideBackground', val)
+})
 </script>
 <style>
 @import '../assets/common.css';

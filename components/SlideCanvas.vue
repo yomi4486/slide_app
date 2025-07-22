@@ -13,7 +13,7 @@
       @click="(e) => { if (props.disabled) return; props.selectElement(i, e.shiftKey || e.ctrlKey || e.metaKey) }"
     >
       <img v-if="el.type === 'image'" :src="el.content" class="slide-el-img" />
-      <div v-else-if="el.type === 'rect'" :style="{ width: '100%', height: '100%', background: el.background || '#1976d2', borderRadius: '8px', boxShadow: el.shadow ? '0 2px 8px #0003' : 'none', border: '1.5px solid #1976d2' }"></div>
+      <div v-else-if="el.type === 'rect'" :style="{ width: '100%', height: '100%', background: el.background || '#1976d2', borderRadius: '8px', boxShadow: el.shadow ? '0 2px 8px #0003' : 'none' }"></div>
       <template v-else>
         <div
           v-if="!props.isEditingText(i)"
@@ -92,6 +92,7 @@ const props = defineProps([
   'onCanvasMouseUp',
   'zoom',
   'slideshow', // 追加
+  'background', // 追加
 ])
 const canvasStyle = computed(() => {
   const style = {
@@ -101,7 +102,7 @@ const canvasStyle = computed(() => {
     minHeight: 0,
     position: 'relative',
     overflow: 'hidden',
-    background: '#fff',
+    background: props.background || '#fff',
     borderRadius: props.slideshow ? '0' : '32px',
     boxShadow: props.slideshow ? 'none' : '0 8px 32px #0002, 0 1.5px 6px #0001',
   }
