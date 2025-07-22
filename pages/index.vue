@@ -1118,7 +1118,6 @@
     width: 1280px;
     height: 720px;
     position: relative;
-    background: white;
   }
   .slideshow-overlay {
     position: fixed;
