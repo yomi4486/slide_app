@@ -94,7 +94,7 @@
     </div>
     <div v-else-if="currentRoute !== 'share'" class="keynote-bg keynote-flex">
       <header class="app-bar">
-        <div class="app-bar-actions">
+        <div class="app-bar-left">
           <button class="app-bar-btn" @click="goHome">🏠 ホームに戻る</button>
           <input class="slide-title-input" v-model="slidesTitle" @input="onTitleInput" placeholder="スライド名を入力" />
           <button class="app-bar-btn" @click="startSlideshow">▶ スライドショー</button>
@@ -103,15 +103,20 @@
           <button v-if="isLoggedIn" class="app-bar-btn" @click="shareSlide">🔗 共有</button>
           <button class="app-bar-btn" @click="saveSlides">書き出し</button>
           <button class="app-bar-btn" @click="newSlides">新規</button>
-          
-          <!-- 認証ボタン -->
-          <div class="auth-section">
-            <button v-if="!isLoggedIn" class="app-bar-btn auth-btn" @click="handleGoogleSignIn">
-              🔐 Googleでログイン
-            </button>
-            <div v-else class="user-info">
-              <span class="user-name">{{ user.displayName }}</span>
-              <button class="app-bar-btn auth-btn" @click="handleSignOut">ログアウト</button>
+        </div>
+        
+        <!-- 認証ボタン - 右端に配置 -->
+        <div class="auth-section">
+          <button v-if="!isLoggedIn" class="google-login-btn" @click="handleGoogleSignIn">
+            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="google-logo" />
+            Googleでログイン
+          </button>
+          <div v-else class="user-menu" :class="{ 'menu-open': isUserMenuOpen }" @click="toggleUserMenu">
+            <img :src="user.photoURL || 'https://www.gravatar.com/avatar/?d=mp'" alt="User" class="user-avatar" />
+            <span class="user-name">{{ user.displayName }}</span>
+            <div class="dropdown-arrow">▼</div>
+            <div v-if="isUserMenuOpen" class="user-dropdown">
+              <button class="dropdown-item" @click.stop="handleSignOut">ログアウト</button>
             </div>
           </div>
         </div>
@@ -316,6 +321,18 @@
   // Firebase認証関連の状態
   const user = ref(null)
   const isLoggedIn = computed(() => !!user.value)
+  const isUserMenuOpen = ref(false)
+  
+  const toggleUserMenu = () => {
+    isUserMenuOpen.value = !isUserMenuOpen.value
+  }
+  
+  // ユーザーメニューの外クリック処理
+  const handleClickOutside = (event) => {
+    if (isUserMenuOpen.value && !event.target.closest('.user-menu')) {
+      isUserMenuOpen.value = false;
+    }
+  };
   const firebaseSlides = ref([])
   const showFirebaseSlides = ref(false)
   
@@ -622,6 +639,9 @@
     checkCurrentRouteWrapper();
     window.addEventListener('popstate', checkCurrentRouteWrapper);
     
+    // ユーザーメニューの外クリック処理
+    document.addEventListener('click', handleClickOutside);
+    
     // Firebase認証状態の監視
     onAuthStateChanged(auth, (firebaseUser) => {
       user.value = firebaseUser;
@@ -651,6 +671,10 @@
     window.removeEventListener('keydown', handleSlideshowKey)
     window.removeEventListener('keydown', handleShareKeyWrapper)
     window.removeEventListener('popstate', checkCurrentRouteWrapper)
+    
+    // ユーザーメニューのイベントリスナーをクリーンアップ
+    document.removeEventListener('click', handleClickOutside);
+    
     if (canvasWrapper.value) {
       canvasWrapper.value.removeEventListener('wheel', onWheel)
       canvasWrapper.value.removeEventListener('touchstart', onTouchStart)
@@ -1291,6 +1315,7 @@
   
   async function handleSignOut() {
     try {
+      isUserMenuOpen.value = false; // メニューを閉じる
       await signOutUser();
       alert('ログアウトしました');
     } catch (error) {
@@ -1642,15 +1667,14 @@
     font-weight: 700;
     letter-spacing: 0.04em;
   }
-  .app-bar-actions {
+  .app-bar-left {
     display: flex;
     gap: 12px;
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
-    max-width: 100vw;
+    max-width: calc(100vw - 300px);
     min-width: 0;
-    width: 100%;
     flex-shrink: 1;
     align-items: center;
   }
@@ -2197,7 +2221,110 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-left: 16px;
+    flex-shrink: 0;
+  }
+  
+  .google-login-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff !important;
+    color: #757575 !important;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.9em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .google-login-btn:hover {
+    background: #f8f9fa !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+  
+  .google-logo {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .user-menu {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    backdrop-filter: blur(10px);
+  }
+  
+  .user-menu:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  
+  .user-menu.menu-open {
+    background: rgba(255, 255, 255, 0.25);
+  }
+  
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  .user-name {
+    color: white;
+    font-weight: 600;
+    font-size: 0.9em;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .dropdown-arrow {
+    color: white;
+    font-size: 0.7em;
+    transition: transform 0.2s;
+  }
+  
+  .menu-open .dropdown-arrow {
+    transform: rotate(180deg);
+  }
+  
+  .user-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    min-width: 150px;
+    z-index: 10001;
+    overflow: hidden;
+  }
+  
+  .dropdown-item {
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: white;
+    color: #333;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 0.9em;
+  }
+  
+  .dropdown-item:hover {
+    background: #f5f5f5;
   }
   
   .auth-btn {
@@ -2213,12 +2340,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-  
-  .user-name {
-    color: white;
-    font-weight: 600;
-    font-size: 0.9em;
   }
   
   .auth-status {
