@@ -1,0 +1,486 @@
+import { initializeApp } from 'firebase/app'
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, orderBy, deleteDoc } from 'firebase/firestore'
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
+
+// Firebase設定
+export const firebaseConfig = {
+  apiKey: "__API_KEY__",
+  authDomain: "__AUTH_DOMAIN__",
+  projectId: "__PROJECT_ID__",
+  storageBucket: "__STORAGE_BUCKET__",
+  messagingSenderId: "__MESSAGING_SENDER_ID__",
+  appId: "__APP_ID__",
+  measurementId: "__MEASUREMENT_ID__"
+};
+
+// Firebase初期化
+const app = initializeApp(firebaseConfig)
+export const auth = getAuth(app)
+export const db = getFirestore(app)
+export const storage = getStorage(app)
+
+// Google認証プロバイダー
+const googleProvider = new GoogleAuthProvider()
+
+// 認証関数
+export const signInWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider)
+    return result.user
+  } catch (error) {
+    console.error('Google sign-in error:', error)
+    throw error
+  }
+}
+
+export const signOutUser = async () => {
+  try {
+    await signOut(auth)
+  } catch (error) {
+    console.error('Sign-out error:', error)
+    throw error
+  }
+}
+
+// 画像をStorageにアップロードする関数
+const uploadImageToStorage = async (imageData, slideId, elementId) => {
+  try {
+    // Data URLから画像データを抽出
+    const response = await fetch(imageData)
+    const blob = await response.blob()
+    
+    // ストレージのパス
+    const imagePath = `slides/${slideId}/images/${elementId}_${Date.now()}.jpg`
+    const imageRef = ref(storage, imagePath)
+    
+    // アップロード
+    const snapshot = await uploadBytes(imageRef, blob)
+    
+    // ダウンロードURLを取得
+    const downloadURL = await getDownloadURL(snapshot.ref)
+    
+    console.log('画像アップロード成功:', downloadURL)
+    return downloadURL
+  } catch (error) {
+    console.error('画像アップロードエラー:', error)
+    throw error
+  }
+}
+
+// 画像データかどうかを判定する関数
+const isImageData = (data) => {
+  return typeof data === 'string' && data.startsWith('data:image/')
+}
+
+// スライドデータから画像を抽出してStorageにアップロードする関数
+const processImagesInSlides = async (slides, slideId) => {
+  const processedSlides = []
+  
+  for (let slideIndex = 0; slideIndex < slides.length; slideIndex++) {
+    const slide = slides[slideIndex]
+    const processedSlide = { ...slide }
+    
+    if (slide.elements && Array.isArray(slide.elements)) {
+      const processedElements = []
+      
+      for (let elementIndex = 0; elementIndex < slide.elements.length; elementIndex++) {
+        const element = { ...slide.elements[elementIndex] }
+        
+        // 画像要素の処理
+        if (element.type === 'image' && element.src && isImageData(element.src)) {
+          console.log(`画像をアップロード中: スライド ${slideIndex}, 要素 ${elementIndex}`)
+          
+          try {
+            const elementId = `slide${slideIndex}_element${elementIndex}`
+            const imageUrl = await uploadImageToStorage(element.src, slideId, elementId)
+            element.src = imageUrl
+            element.isCloudImage = true
+          } catch (error) {
+            console.error('画像アップロードに失敗:', error)
+            // アップロードに失敗した場合は要素を除外
+            continue
+          }
+        }
+        
+        // その他の画像データをチェック
+        for (const [key, value] of Object.entries(element)) {
+          if (isImageData(value)) {
+            console.log(`画像データを検出: ${key}`)
+            try {
+              const elementId = `slide${slideIndex}_element${elementIndex}_${key}`
+              const imageUrl = await uploadImageToStorage(value, slideId, elementId)
+              element[key] = imageUrl
+            } catch (error) {
+              console.error(`画像アップロードに失敗 (${key}):`, error)
+              // 失敗した場合はプロパティを削除
+              delete element[key]
+            }
+          }
+        }
+        
+        processedElements.push(element)
+      }
+      
+      processedSlide.elements = processedElements
+    }
+    
+    processedSlides.push(processedSlide)
+  }
+  
+  return processedSlides
+}
+
+// Firestore用にデータをクリーンアップする関数
+const cleanDataForFirestore = (data) => {
+  if (data === null || data === undefined) {
+    return null
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map(item => cleanDataForFirestore(item))
+  }
+  
+  if (typeof data === 'object') {
+    // Date オブジェクトはそのまま通す（Firestoreでサポート）
+    if (data instanceof Date) {
+      return data
+    }
+    
+    // HTMLElement やその他のDOM要素は除外
+    if (data instanceof Element || data instanceof Node) {
+      console.warn('DOM要素が検出されました、除外します:', data)
+      return null
+    }
+    
+    // File オブジェクトなどは除外
+    if (data instanceof File || data instanceof Blob) {
+      console.warn('Fileオブジェクトが検出されました、除外します:', data)
+      return null
+    }
+    
+    // 標準的なObjectのみ処理
+    if (data.constructor === Object) {
+      const cleaned = {}
+      for (const [key, value] of Object.entries(data)) {
+        // undefinedや関数は除外
+        if (value !== undefined && typeof value !== 'function') {
+          const cleanedValue = cleanDataForFirestore(value)
+          if (cleanedValue !== null) {
+            cleaned[key] = cleanedValue
+          }
+        }
+      }
+      return cleaned
+    }
+    
+    // その他のオブジェクト（カスタムクラスなど）は文字列化
+    console.warn('非標準オブジェクトが検出されました:', data.constructor.name, data)
+    try {
+      return JSON.parse(JSON.stringify(data))
+    } catch (e) {
+      return String(data)
+    }
+  }
+  
+  // プリミティブ型はそのまま返す
+  if (typeof data === 'string' || typeof data === 'number' || typeof data === 'boolean') {
+    return data
+  }
+  
+  // その他は文字列に変換
+  return String(data)
+}
+
+// デバッグ用：データの問題箇所を特定する関数
+const validateDataForFirestore = (data, path = '') => {
+  const issues = []
+  
+  const validate = (obj, currentPath) => {
+    if (obj === null || obj === undefined) return
+    
+    if (Array.isArray(obj)) {
+      obj.forEach((item, index) => validate(item, `${currentPath}[${index}]`))
+    } else if (typeof obj === 'object' && obj.constructor === Object) {
+      for (const [key, value] of Object.entries(obj)) {
+        const newPath = currentPath ? `${currentPath}.${key}` : key
+        if (typeof value === 'function') {
+          issues.push(`関数が含まれています: ${newPath}`)
+        } else if (value !== undefined) {
+          validate(value, newPath)
+        }
+      }
+    } else if (typeof obj === 'object' && obj.constructor !== Object) {
+      issues.push(`非標準オブジェクトが含まれています: ${currentPath} (type: ${obj.constructor.name})`)
+    }
+  }
+  
+  validate(data, path)
+  return issues
+}
+
+// より詳細なデバッグ用関数
+const debugSlideData = (slideData) => {
+  console.log('=== スライドデータのデバッグ ===')
+  
+  if (slideData.slides && Array.isArray(slideData.slides)) {
+    slideData.slides.forEach((slide, slideIndex) => {
+      console.log(`スライド ${slideIndex}:`, slide)
+      
+      if (slide.elements && Array.isArray(slide.elements)) {
+        slide.elements.forEach((element, elementIndex) => {
+          console.log(`  要素 ${elementIndex}:`, element)
+          
+          // 各プロパティをチェック
+          for (const [key, value] of Object.entries(element)) {
+            const type = typeof value
+            const constructor = value?.constructor?.name || 'unknown'
+            
+            if (type === 'object' && constructor !== 'Object' && value !== null) {
+              console.warn(`    問題のあるプロパティ: ${key} = ${value} (type: ${constructor})`)
+            }
+            
+            if (type === 'function') {
+              console.warn(`    関数プロパティ: ${key}`)
+            }
+            
+            if (value === undefined) {
+              console.warn(`    undefinedプロパティ: ${key}`)
+            }
+          }
+        })
+      }
+      
+      if (slide.meta) {
+        console.log(`  メタデータ:`, slide.meta)
+        for (const [key, value] of Object.entries(slide.meta)) {
+          const type = typeof value
+          const constructor = value?.constructor?.name || 'unknown'
+          
+          if (type === 'object' && constructor !== 'Object' && value !== null) {
+            console.warn(`    問題のあるメタプロパティ: ${key} = ${value} (type: ${constructor})`)
+          }
+        }
+      }
+    })
+  }
+  
+  console.log('=== デバッグ終了 ===')
+}
+
+// Firestore操作関数
+export const saveSlideToFirestore = async (slideData, isPublic = false) => {
+  if (!auth.currentUser) throw new Error('ユーザーがログインしていません')
+  
+  try {
+    console.log('保存前のデータ:', slideData)
+    
+    const slideId = `slide_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // 画像をStorageにアップロード
+    console.log('画像の処理を開始...')
+    const processedSlides = await processImagesInSlides(slideData.slides || [], slideId)
+    console.log('画像の処理完了:', processedSlides)
+    
+    // データをFirestore用にクリーンアップ
+    console.log('データクリーンアップ開始...')
+    const cleanedSlides = cleanDataForFirestore(processedSlides)
+    console.log('データクリーンアップ完了:', cleanedSlides)
+    
+    const slideDoc = {
+      id: slideId,
+      title: slideData.title || '無題スライド',
+      slides: cleanedSlides,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userId: auth.currentUser.uid,
+      userEmail: auth.currentUser.email,
+      userName: auth.currentUser.displayName,
+      isPublic: isPublic,
+      shareUrl: isPublic ? `${window.location.origin}/share/${slideId}` : null
+    }
+    
+    console.log('保存するデータ:', slideDoc)
+    
+    await setDoc(doc(db, 'slides', slideId), slideDoc)
+    console.log('保存成功!')
+    return slideDoc
+  } catch (error) {
+    console.error('Firestore保存エラー:', error)
+    throw error
+  }
+}
+
+export const getSlideFromFirestore = async (slideId) => {
+  const slideDoc = await getDoc(doc(db, 'slides', slideId))
+  if (slideDoc.exists()) {
+    return slideDoc.data()
+  }
+  return null
+}
+
+export const updateSlideInFirestore = async (slideId, slideData, isPublic = false) => {
+  if (!auth.currentUser) throw new Error('ユーザーがログインしていません')
+  
+  try {
+    console.log('更新前のデータ:', slideData)
+    
+    // 画像をStorageにアップロード
+    console.log('画像の処理を開始...')
+    const processedSlides = await processImagesInSlides(slideData.slides || [], slideId)
+    console.log('画像の処理完了:', processedSlides)
+    
+    // データをFirestore用にクリーンアップ
+    const cleanedSlides = cleanDataForFirestore(processedSlides)
+    
+    const updateDoc = {
+      title: slideData.title || '無題スライド',
+      slides: cleanedSlides,
+      updatedAt: new Date(),
+      isPublic: isPublic,
+      shareUrl: isPublic ? `${window.location.origin}/share/${slideId}` : null
+    }
+    
+    console.log('更新するデータ:', updateDoc)
+    
+    await setDoc(doc(db, 'slides', slideId), updateDoc, { merge: true })
+    return { id: slideId, ...updateDoc }
+  } catch (error) {
+    console.error('Firestore更新エラー:', error)
+    throw error
+  }
+}
+
+export const getUserSlides = async () => {
+  if (!auth.currentUser) return []
+  
+  try {
+    // シンプルなクエリに変更（インデックス不要）
+    const q = query(
+      collection(db, 'slides'),
+      where('userId', '==', auth.currentUser.uid)
+    )
+    
+    const querySnapshot = await getDocs(q)
+    const slides = querySnapshot.docs.map(doc => doc.data())
+    
+    // クライアントサイドでソート
+    return slides.sort((a, b) => {
+      const dateA = a.updatedAt?.toDate?.() || new Date(a.updatedAt || 0)
+      const dateB = b.updatedAt?.toDate?.() || new Date(b.updatedAt || 0)
+      return dateB.getTime() - dateA.getTime()
+    })
+  } catch (error) {
+    console.error('getUserSlides エラー:', error)
+    
+    // フォールバック：全てのスライドを取得してフィルタ
+    try {
+      const allSlides = await getDocs(collection(db, 'slides'))
+      const userSlides = allSlides.docs
+        .map(doc => doc.data())
+        .filter(slide => slide.userId === auth.currentUser.uid)
+        .sort((a, b) => {
+          const dateA = a.updatedAt?.toDate?.() || new Date(a.updatedAt || 0)
+          const dateB = b.updatedAt?.toDate?.() || new Date(b.updatedAt || 0)
+          return dateB.getTime() - dateA.getTime()
+        })
+      
+      return userSlides
+    } catch (fallbackError) {
+      console.error('フォールバッククエリもエラー:', fallbackError)
+      return []
+    }
+  }
+}
+
+export const getPublicSlide = async (slideId) => {
+  try {
+    console.log('公開スライドを取得中:', slideId)
+    const slideDoc = await getDoc(doc(db, 'slides', slideId))
+    
+    if (!slideDoc.exists()) {
+      console.log('スライドが存在しません:', slideId)
+      return null
+    }
+    
+    const data = slideDoc.data()
+    console.log('取得したスライドデータ:', data)
+    
+    if (!data.isPublic) {
+      console.log('スライドが非公開です:', slideId)
+      return null
+    }
+    
+    console.log('公開スライドの取得成功:', slideId)
+    return data
+  } catch (error) {
+    console.error('公開スライド取得エラー:', error)
+    return null
+  }
+}
+
+export const deleteSlideFromFirestore = async (slideId) => {
+  if (!auth.currentUser) throw new Error('ユーザーがログインしていません')
+  
+  try {
+    // まずスライドデータを取得
+    const slideData = await getSlideFromFirestore(slideId)
+    if (!slideData) {
+      throw new Error('スライドが見つかりません')
+    }
+    
+    // ユーザーの所有確認
+    if (slideData.userId !== auth.currentUser.uid) {
+      throw new Error('このスライドを削除する権限がありません')
+    }
+    
+    // Storageから画像を削除
+    if (slideData.slides && Array.isArray(slideData.slides)) {
+      for (const slide of slideData.slides) {
+        if (slide.elements && Array.isArray(slide.elements)) {
+          for (const element of slide.elements) {
+            // クラウド画像の削除
+            if (element.isCloudImage && element.src && element.src.includes('firebase')) {
+              try {
+                const imageRef = ref(storage, element.src)
+                await deleteObject(imageRef)
+                console.log('画像削除成功:', element.src)
+              } catch (error) {
+                console.warn('画像削除エラー:', error)
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Firestoreからスライドを削除
+    await deleteDoc(doc(db, 'slides', slideId))
+    console.log('スライド削除成功:', slideId)
+    
+  } catch (error) {
+    console.error('スライド削除エラー:', error)
+    throw error
+  }
+}
+
+// より高速なユーザースライド取得（インデックス使用版）
+export const getUserSlidesWithIndex = async () => {
+  if (!auth.currentUser) return []
+  
+  try {
+    // インデックスが作成済みの場合のクエリ
+    const q = query(
+      collection(db, 'slides'),
+      where('userId', '==', auth.currentUser.uid),
+      orderBy('updatedAt', 'desc')
+    )
+    
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map(doc => doc.data())
+  } catch (error) {
+    console.warn('インデックス使用クエリが失敗、フォールバック:', error)
+    // インデックスがない場合は通常のgetUserSlidesを使用
+    return await getUserSlides()
+  }
+}
