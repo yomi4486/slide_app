@@ -149,8 +149,18 @@
             />
           </div>
           <button class="slideshow-exit-btn" @click="endSlideshow">終了</button>
-          <button class="slideshow-prev-btn" @click="goToPrevSlide" :disabled="current === 0">‹</button>
-          <button class="slideshow-next-btn" @click="goToNextSlide" :disabled="current === slides.length - 1">›</button>
+          <button 
+            class="slideshow-prev-btn" 
+            :class="{ 'at-boundary': current === 0 }"
+            @click="goToPrevSlide"
+            :title="current === 0 ? '前のスライドがありません。クリックで編集画面に戻ります' : '前のスライド'"
+          >‹</button>
+          <button 
+            class="slideshow-next-btn" 
+            :class="{ 'at-boundary': current === slides.length - 1 }"
+            @click="goToNextSlide"
+            :title="current === slides.length - 1 ? '次のスライドがありません。クリックで編集画面に戻ります' : '次のスライド'"
+          >›</button>
           <div class="slideshow-page">{{ current + 1 }} / {{ slides.length }}</div>
         </div>
       </div>
@@ -324,12 +334,18 @@
   function goToPrevSlide() {
     if (current.value > 0) {
       current.value--;
+    } else {
+      // 最初のスライドで前に戻ろうとした場合、スライドショーを終了
+      endSlideshow();
     }
   }
   
   function goToNextSlide() {
     if (current.value < slides.value.length - 1) {
       current.value++;
+    } else {
+      // 最後のスライドで次に進もうとした場合、スライドショーを終了
+      endSlideshow();
     }
   }
   function handleSlideshowKey(e) {
@@ -1827,6 +1843,16 @@
     opacity: 0.5;
     cursor: not-allowed;
     transform: translateY(-50%) scale(1);
+  }
+  
+  .slideshow-prev-btn.at-boundary, .slideshow-next-btn.at-boundary {
+    background: rgba(255, 200, 200, 0.9);
+    color: #d32f2f;
+  }
+  
+  .slideshow-prev-btn.at-boundary:hover, .slideshow-next-btn.at-boundary:hover {
+    background: rgba(255, 180, 180, 1);
+    color: #b71c1c;
   }
   
   .slideshow-page {
