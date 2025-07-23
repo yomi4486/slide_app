@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/gen-firebase_js.js",
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
