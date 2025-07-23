@@ -6,6 +6,13 @@
       <div class="edit-group" v-if="currentEl?.type === 'image'">
         <label class="edit-label">画像URL</label>
         <input v-model="currentEl.content" class="edit-input" />
+        <div class="edit-group">
+          <label class="edit-label">透明度</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="range" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" style="flex:1;" />
+            <input type="number" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" class="edit-input short" />
+          </div>
+        </div>
       </div>
       <template v-if="currentEl?.type === 'text'">
         <div class="edit-group">
@@ -26,6 +33,13 @@
           </div>
         </div>
         <div class="edit-group">
+          <label class="edit-label">透明度</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="range" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" style="flex:1;" />
+            <input type="number" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" class="edit-input short" />
+          </div>
+        </div>
+        <div class="edit-group">
           <label class="edit-label">文字揃え</label>
           <select v-model="currentEl.textAlign" class="edit-input short">
             <option value="center">中央</option>
@@ -40,6 +54,13 @@
           <div class="color-row">
             <input type="color" v-model="currentEl.background" class="edit-color" />
             <input v-model="currentEl.background" class="edit-input short" />
+          </div>
+        </div>
+        <div class="edit-group">
+          <label class="edit-label">透明度</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="range" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" style="flex:1;" />
+            <input type="number" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" class="edit-input short" />
           </div>
         </div>
       </template>
