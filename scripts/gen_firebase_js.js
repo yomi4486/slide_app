@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const templatePath = path.resolve(__dirname, "../utils/firebase.js.example");
 const outputPath = path.resolve(__dirname, "../utils/firebase.js");
