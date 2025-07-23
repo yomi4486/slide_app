@@ -1,7 +1,7 @@
 <template>
   <div class="edit-section keynote-panel right-edit-panel modern-edit-panel">
     <template v-if="currentEl">
-      <h3 class="edit-title">要素編集</h3>
+      <h3 class="edit-title">{{ getElementTypeName(currentEl?.type) }}編集</h3>
       <!-- 既存の要素編集UI -->
       <div class="edit-group" v-if="currentEl?.type === 'image'">
         <label class="edit-label">画像URL</label>
@@ -64,6 +64,35 @@
           </div>
         </div>
       </template>
+      <template v-if="currentEl?.type === 'qr'">
+        <div class="edit-group">
+          <label class="edit-label">QRコード内容（URL/テキスト）</label>
+          <textarea v-model="currentEl.content" class="edit-input" rows="3" style="resize:vertical; min-height:60px;" placeholder="https://example.com または任意のテキスト"></textarea>
+        </div>
+        <div class="edit-row">
+          <div class="edit-group color-group">
+            <label class="edit-label">QRコード色</label>
+            <div class="color-row">
+              <input type="color" v-model="currentEl.color" class="edit-color" />
+              <input v-model="currentEl.color" class="edit-input short" />
+            </div>
+          </div>
+          <div class="edit-group color-group">
+            <label class="edit-label">背景色</label>
+            <div class="color-row">
+              <input type="color" v-model="currentEl.background" class="edit-color" />
+              <input v-model="currentEl.background" class="edit-input short" />
+            </div>
+          </div>
+        </div>
+        <div class="edit-group">
+          <label class="edit-label">透明度</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="range" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" style="flex:1;" />
+            <input type="number" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" class="edit-input short" />
+          </div>
+        </div>
+      </template>
       <div class="edit-row">
         <div class="edit-group">
           <label class="edit-label">X</label>
@@ -108,6 +137,18 @@ const props = defineProps(['currentEls', 'slideBackground'])
 const emit = defineEmits(['removeElement', 'moveElementZ', 'update:slideBackground'])
 const currentEl = computed(() => props.currentEls?.[0] || null)
 
+// QRコードの場合、幅と高さを同期する
+watch(() => currentEl.value?.width, (newWidth) => {
+  if (currentEl.value?.type === 'qr' && newWidth !== undefined) {
+    currentEl.value.height = newWidth;
+  }
+})
+watch(() => currentEl.value?.height, (newHeight) => {
+  if (currentEl.value?.type === 'qr' && newHeight !== undefined) {
+    currentEl.value.width = newHeight;
+  }
+})
+
 // スライド背景色編集用の双方向バインディング
 const slideBackgroundProxy = ref(props.slideBackground || '#ffffff')
 watch(() => props.slideBackground, (val) => {
@@ -116,6 +157,17 @@ watch(() => props.slideBackground, (val) => {
 watch(slideBackgroundProxy, (val) => {
   emit('update:slideBackground', val)
 })
+
+// 要素タイプ名を取得
+function getElementTypeName(type) {
+  const typeNames = {
+    'image': '画像',
+    'text': 'テキスト',
+    'rect': '図形',
+    'qr': 'QRコード'
+  };
+  return typeNames[type] || '要素';
+}
 </script>
 <style>
 @import '../assets/common.css';

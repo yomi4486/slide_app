@@ -52,6 +52,8 @@
         <div class="app-bar-actions">
           <button class="app-bar-btn" @click="goHome">🏠 ホームに戻る</button>
           <input class="slide-title-input" v-model="slidesTitle" @input="onTitleInput" placeholder="スライド名を入力" />
+          <button class="app-bar-btn" @click="startSlideshow">▶ スライドショー</button>
+          <button class="app-bar-btn" @click="manualLocalSave">💾 保存</button>
           <button class="app-bar-btn" @click="saveSlides">書き出し</button>
           <button class="app-bar-btn" @click="newSlides">新規</button>
         </div>
@@ -171,14 +173,13 @@
         <input type="file" ref="localImageInput" accept="image/*" style="display:none" @change="onLocalImageChange" />
         <button class="bottom-bar-btn" @click="addElement('text')">＋テキスト追加</button>
         <button class="bottom-bar-btn" @click="addElement('rect')">＋四角形追加</button>
+        <button class="bottom-bar-btn" @click="addQRCode">＋QRコード追加</button>
         <div class="canvas-zoom-ui">
           <button @click="zoomOut" :disabled="Number(zoom.value) <= minZoom">−</button>
           <span>{{ isNaN(zoom.value) ? 100 : Math.round(zoom.value * 100) }}%</span>
           <button @click="zoomIn" :disabled="Number(zoom.value) >= maxZoom">＋</button>
           <button @click="resetZoom" :disabled="zoom.value === 1">100%</button>
         </div>
-        <button class="bottom-bar-btn" @click="startSlideshow">▶スライドショー</button>
-        <button class="bottom-bar-btn" @click="manualLocalSave">ローカル保存</button>
         <label class="autosave-toggle bottom-autosave">
           <span>自動保存</span>
           <span class="ios-switch">
@@ -641,10 +642,34 @@
       el = { type: 'text', content: 'テキスト', x: 150, y: 150, width: 200, height: 60, fontSize: 32, color: '#222222', shadow: false, background: '' }
     } else if (type === 'rect') {
       el = { type: 'rect', x: 120, y: 120, width: 200, height: 120, background: '#1976d2', shadow: false }
+    } else if (type === 'qr') {
+      el = { type: 'qr', content: 'https://example.com', x: 150, y: 150, width: 150, height: 150, color: '#000000', background: '#ffffff', shadow: false }
     }
     slides.value[current.value].elements.push(el)
     selectedElements.value = [slides.value[current.value].elements.length - 1]
     autoLocalSave()
+  }
+  
+  // QRコード追加
+  function addQRCode() {
+    const url = prompt('QRコードにしたいURLまたはテキストを入力してください:', 'https://example.com')
+    if (url && url.trim()) {
+      pushHistory()
+      const el = { 
+        type: 'qr', 
+        content: url.trim(), 
+        x: 150, 
+        y: 150, 
+        width: 150, 
+        height: 150, 
+        color: '#000000', // QRコードの色
+        background: '#ffffff', // QRコードの背景色
+        shadow: false
+      }
+      slides.value[current.value].elements.push(el)
+      selectedElements.value = [slides.value[current.value].elements.length - 1]
+      autoLocalSave()
+    }
   }
   
   // スライド切り替え
@@ -895,6 +920,16 @@
       pointerEvents: 'none',
       whiteSpace: 'pre-line',
     }
+  }
+  
+  // QRコードのURL生成
+  function getQRCodeURL(content, size = 150, color = '000000', bgcolor = 'ffffff') {
+    // QRサーバーAPIを使用してQRコードを生成
+    const encodedContent = encodeURIComponent(content);
+    // # を除去して6桁のカラーコードにする
+    const cleanColor = color.replace('#', '');
+    const cleanBgColor = bgcolor.replace('#', '');
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodedContent}&color=${cleanColor}&bgcolor=${cleanBgColor}`;
   }
   
   // Deleteキーで要素削除

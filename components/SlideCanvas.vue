@@ -13,6 +13,7 @@
       @click="(e) => { if (props.disabled) return; props.selectElement(i, e.shiftKey || e.ctrlKey || e.metaKey) }"
     >
       <img v-if="el.type === 'image'" :src="el.content" class="slide-el-img" />
+      <img v-else-if="el.type === 'qr'" :src="getQRCodeURL(el.content, Math.max(el.width, el.height), el.color, el.background)" class="slide-el-img" :alt="'QRコード: ' + el.content" />
       <div v-else-if="el.type === 'rect'" :style="{ width: '100%', height: '100%', background: el.background || '#1976d2', borderRadius: '8px', boxShadow: el.shadow ? '0 2px 8px #0003' : 'none', border: '1.5px solid #1976d2', opacity: el.opacity ?? 1 }"></div>
       <template v-else>
         <div
@@ -110,6 +111,17 @@ const canvasStyle = computed(() => {
   if (props.canvasTop !== undefined) style.top = props.canvasTop + 'px'
   return style
 })
+
+// QRコードのURL生成
+function getQRCodeURL(content, size = 150, color = '000000', bgcolor = 'ffffff') {
+  // QRサーバーAPIを使用してQRコードを生成
+  const encodedContent = encodeURIComponent(content);
+  // # を除去して6桁のカラーコードにする
+  const cleanColor = color.replace('#', '');
+  const cleanBgColor = bgcolor.replace('#', '');
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodedContent}&color=${cleanColor}&bgcolor=${cleanBgColor}`;
+}
+
 // ドラッグ選択のmousemove/upイベントを動的に付け外し
 let moveHandler = null
 let upHandler = null
