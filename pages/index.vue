@@ -1,11 +1,38 @@
 <template>
+
     <div v-if="isHome" class="home-bg">
       <div class="home-container">
-        <h1>ようこそ！</h1>
+        <h1>俺の考えた最強スライドアプリ</h1>
+        
+        <!-- 認証状態の表示 -->
+        <div class="auth-status" v-if="isLoggedIn">
+          <p>👋 こんにちは、{{ user.displayName }}さん</p>
+        </div>
+        
         <button class="home-btn" @click="newSlidesWithTitle">＋ 新規作成</button>
         <button class="home-btn" @click="openFileImport">ファイルから読み込む</button>
         <input type="file" ref="fileImportInput" accept="application/json" style="display:none" @change="onFileImportChange" />
-        <div class="slides-list">
+        
+        <!-- スライド表示の切り替え -->
+        <div class="slide-tabs" v-if="isLoggedIn">
+          <button 
+            class="tab-btn" 
+            :class="{ active: !showFirebaseSlides }"
+            @click="showFirebaseSlides = false"
+          >
+            ローカルスライド
+          </button>
+          <button 
+            class="tab-btn" 
+            :class="{ active: showFirebaseSlides }"
+            @click="loadFirebaseSlides"
+          >
+            クラウドスライド
+          </button>
+        </div>
+        
+        <!-- ローカルスライド一覧 -->
+        <div v-if="!showFirebaseSlides" class="slides-list">
           <div v-for="(slide, idx) in slidesList" :key="slide.id" class="slide-list-item"
             @dragover.prevent="onSlideDragOver($event, idx)"
             @drop.prevent="onSlideDrop($event, idx)"
@@ -45,17 +72,48 @@
             </div>
           </div>
         </div>
+        
+        <!-- Firebaseスライド一覧 -->
+        <div v-else-if="showFirebaseSlides" class="slides-list">
+          <div v-for="slide in firebaseSlides" :key="slide.id" class="slide-list-item firebase-slide">
+            <div class="slide-thumb">
+              <span class="slide-thumb-placeholder">☁️</span>
+            </div>
+            <div class="slide-title">{{ slide.title }}</div>
+            <div class="slide-date">{{ formatDate(slide.updatedAt?.toDate()) }}</div>
+            <div class="slide-actions">
+              <button @click.stop="openFirebaseSlide(slide.id)">開く</button>
+              <button @click.stop="copyShareUrl(slide)" v-if="slide.isPublic">共有リンクをコピー</button>
+              <button @click.stop="toggleSlidePublic(slide)">
+                {{ slide.isPublic ? '非公開にする' : '公開する' }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-    <div v-else class="keynote-bg keynote-flex">
+    <div v-else-if="currentRoute !== 'share'" class="keynote-bg keynote-flex">
       <header class="app-bar">
         <div class="app-bar-actions">
           <button class="app-bar-btn" @click="goHome">🏠 ホームに戻る</button>
           <input class="slide-title-input" v-model="slidesTitle" @input="onTitleInput" placeholder="スライド名を入力" />
           <button class="app-bar-btn" @click="startSlideshow">▶ スライドショー</button>
           <button class="app-bar-btn" @click="manualLocalSave">💾 保存</button>
+          <button v-if="isLoggedIn" class="app-bar-btn" @click="saveToCloud">☁️ クラウド保存</button>
+          <button v-if="isLoggedIn" class="app-bar-btn" @click="shareSlide">🔗 共有</button>
           <button class="app-bar-btn" @click="saveSlides">書き出し</button>
           <button class="app-bar-btn" @click="newSlides">新規</button>
+          
+          <!-- 認証ボタン -->
+          <div class="auth-section">
+            <button v-if="!isLoggedIn" class="app-bar-btn auth-btn" @click="handleGoogleSignIn">
+              🔐 Googleでログイン
+            </button>
+            <div v-else class="user-info">
+              <span class="user-name">{{ user.displayName }}</span>
+              <button class="app-bar-btn auth-btn" @click="handleSignOut">ログアウト</button>
+            </div>
+          </div>
         </div>
       </header>
       <SlideListMenu :slides="slides" :current="current" @goTo="goTo" @addSlide="addSlide" @moveSlide="moveSlide" />
@@ -131,6 +189,27 @@
         <div class="slideshow-canvas-wrapper">
           <div class="slideshow-canvas-scaler" :style="{ width: baseWidth + 'px', height: baseHeight + 'px', transform: `scale(${slideshowScale})`, transformOrigin: 'center center' }">
             <SlideCanvas
+              v-if="currentRoute === 'share' && shareSlideData"
+              :elements="shareSlideData.slides[currentSlide].elements"
+              :selectedElements="[]"
+              :canvasWidth="baseWidth"
+              :canvasHeight="baseHeight"
+              :zoom="1"
+              :elementStyle="elementStyle"
+              :textElementStyle="textElementStyle"
+              :isEditingText="alwaysFalse"
+              :background="shareSlideData.slides[currentSlide].background || '#ffffff'"
+              :disabled="true"
+              :selectElement="() => {}"
+              :startDrag="() => {}"
+              :startResize="() => {}"
+              :onCanvasMouseDown="() => {}"
+              :clearSelection="() => {}"
+              :startInlineEdit="() => {}"
+              :finishInlineEdit="() => {}"
+            />
+            <SlideCanvas
+              v-else
               :elements="slides[current].elements"
               :selectedElements="[]"
               :canvasWidth="baseWidth"
@@ -153,17 +232,20 @@
           <button class="slideshow-exit-btn" @click="endSlideshow">終了</button>
           <button 
             class="slideshow-prev-btn" 
-            :class="{ 'at-boundary': current === 0 }"
+            :class="{ 'at-boundary': currentRoute === 'share' ? currentSlide === 0 : current === 0 }"
             @click="goToPrevSlide"
-            :title="current === 0 ? '前のスライドがありません。クリックで編集画面に戻ります' : '前のスライド'"
+            :title="(currentRoute === 'share' ? currentSlide === 0 : current === 0) ? '前のスライドがありません。クリックで編集画面に戻ります' : '前のスライド'"
           >‹</button>
           <button 
             class="slideshow-next-btn" 
-            :class="{ 'at-boundary': current === slides.length - 1 }"
+            :class="{ 'at-boundary': currentRoute === 'share' ? currentSlide === shareSlideData?.slides.length - 1 : current === slides.length - 1 }"
             @click="goToNextSlide"
-            :title="current === slides.length - 1 ? '次のスライドがありません。クリックで編集画面に戻ります' : '次のスライド'"
+            :title="(currentRoute === 'share' ? currentSlide === shareSlideData?.slides.length - 1 : current === slides.length - 1) ? '次のスライドがありません。クリックで編集画面に戻ります' : '次のスライド'"
           >›</button>
-          <div class="slideshow-page">{{ current + 1 }} / {{ slides.length }}</div>
+          <div class="slideshow-page">
+            <span v-if="currentRoute === 'share'">{{ currentSlide + 1 }} / {{ shareSlideData?.slides.length }}</span>
+            <span v-else>{{ current + 1 }} / {{ slides.length }}</span>
+          </div>
         </div>
       </div>
       <!-- Bottom Bar -->
@@ -189,17 +271,70 @@
         </label>
       </footer>
     </div>
+
+    <!-- 共有ページビュー -->
+    <ShareViewer 
+      v-if="currentRoute === 'share'"
+      :shareLoading="shareLoading"
+      :shareError="shareError"
+      :shareSlideData="shareSlideData"
+      :currentSlide="currentSlide"
+      :baseWidth="baseWidth"
+      :baseHeight="baseHeight"
+      :elementStyle="elementStyle"
+      :textElementStyle="textElementStyle"
+      @navigateToHome="navigateToHome"
+      @startSlideshow="startSlideshow"
+      @goToPrevSlide="goToPrevSlide"
+      @goToNextSlide="goToNextSlide"
+    />
   </template>
   <script setup>
   import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
   import SlideListMenu from '../components/SlideListMenu.vue'
   import SlideCanvas from '../components/SlideCanvas.vue'
   import ElementEditPanel from '../components/ElementEditPanel.vue'
+  import ShareViewer from '../components/ShareViewer.vue'
+  import { useShareSlide } from '../composables/useShareSlide.js'
+  import { useRouting } from '../composables/useRouting.js'
   import * as idb from '../utils/idb.js'
   import { toRaw } from 'vue'
+  import { 
+    auth, 
+    signInWithGoogle, 
+    signOutUser, 
+    saveSlideToFirestore, 
+    getUserSlides,
+    getSlideFromFirestore,
+    getPublicSlide
+  } from '../utils/firebase.js'
+  import { onAuthStateChanged } from 'firebase/auth'
   
   // スライドショー用のダミー関数
   const alwaysFalse = () => false;
+  
+  // Firebase認証関連の状態
+  const user = ref(null)
+  const isLoggedIn = computed(() => !!user.value)
+  const firebaseSlides = ref([])
+  const showFirebaseSlides = ref(false)
+  
+  // ルーティング機能の使用
+  const { isHome, currentRoute, checkCurrentRoute, navigateToHome } = useRouting()
+  
+  // share機能の使用
+  const { 
+    shareSlideId, 
+    shareSlideData, 
+    shareLoading, 
+    shareError, 
+    currentSlide, 
+    loadSharedSlide, 
+    goToPrevSlide: shareGoToPrevSlide, 
+    goToNextSlide: shareGoToNextSlide,
+    handleShareKey
+  } = useShareSlide()
+  
   // スライドショー用のウィンドウサイズreactive
   const windowWidth = ref(0)
   const windowHeight = ref(0)
@@ -300,22 +435,12 @@
     // 最小スケールを0.1に設定して、必ず表示されるようにする
     return Math.max(scale, 0.1);
   })
-  watch(slideshowScale, (val) => {
-    console.log('slideshowScale changed:', val);
-    console.log('Window size:', windowWidth.value, 'x', windowHeight.value);
-    console.log('Base size:', baseWidth, 'x', baseHeight);
-  });
   function startSlideshow() {
     updateWindowSize(); // 画面サイズを再計算
-    console.log('Starting slideshow...');
-    console.log('Window size before:', windowWidth.value, 'x', windowHeight.value);
     
     // 少し遅延を入れてウィンドウサイズが確実に更新されるようにする
     nextTick(() => {
       updateWindowSize();
-      console.log('Window size after update:', windowWidth.value, 'x', windowHeight.value);
-      console.log('Base size:', baseWidth, 'x', baseHeight);
-      console.log('Calculated scale:', slideshowScale.value);
       
       isSlideshow.value = true;
       document.body.style.overflow = 'hidden';
@@ -324,29 +449,46 @@
   function endSlideshow() {
     isSlideshow.value = false;
     document.body.style.overflow = '';
-    isHome.value = false; // 編集画面に戻す
+    
+    // share画面の場合は編集画面に戻さない
+    if (currentRoute.value !== 'share') {
+      isHome.value = false; // 編集画面に戻す
+    }
+    
     // スライドショー終了後にレイアウトを再計算
     nextTick(() => {
       updateWindowSize();
-      updateCanvasSize();
+      if (currentRoute.value !== 'share') {
+        updateCanvasSize();
+      }
     });
   }
   
   function goToPrevSlide() {
-    if (current.value > 0) {
-      current.value--;
+    if (currentRoute.value === 'share' && shareSlideData.value) {
+      // 共有スライド用
+      shareGoToPrevSlide()
     } else {
-      // 最初のスライドで前に戻ろうとした場合、スライドショーを終了
-      endSlideshow();
+      // 通常のスライドショー用
+      if (current.value > 0) {
+        current.value--;
+      } else {
+        endSlideshow();
+      }
     }
   }
   
   function goToNextSlide() {
-    if (current.value < slides.value.length - 1) {
-      current.value++;
+    if (currentRoute.value === 'share' && shareSlideData.value) {
+      // 共有スライド用
+      shareGoToNextSlide()
     } else {
-      // 最後のスライドで次に進もうとした場合、スライドショーを終了
-      endSlideshow();
+      // 通常のスライドショー用
+      if (current.value < slides.value.length - 1) {
+        current.value++;
+      } else {
+        endSlideshow();
+      }
     }
   }
   function handleSlideshowKey(e) {
@@ -359,7 +501,12 @@
       endSlideshow()
     }
   }
-  const isHome = ref(true)
+
+  // share画面用のキーボードハンドラー（composableの関数を使用）
+  function handleShareKeyWrapper(e) {
+    handleShareKey(e, currentRoute.value, isSlideshow.value)
+  }
+  
   const slidesList = ref([])
   const slidesTitle = ref('')
   const slidesMeta = ref({})
@@ -470,8 +617,23 @@
   }
   onMounted(async () => {
     await loadSlidesList();
+    
+    // URL変化を監視してルーティング処理
+    checkCurrentRouteWrapper();
+    window.addEventListener('popstate', checkCurrentRouteWrapper);
+    
+    // Firebase認証状態の監視
+    onAuthStateChanged(auth, (firebaseUser) => {
+      user.value = firebaseUser;
+      if (!firebaseUser) {
+        firebaseSlides.value = [];
+        showFirebaseSlides.value = false;
+      }
+    });
+    
     window.addEventListener('keydown', handleKeydown)
     window.addEventListener('keydown', handleSlideshowKey)
+    window.addEventListener('keydown', handleShareKeyWrapper)
     // サイトを開いた時点でローカルデータ自動読込
     // localLoad() // localLoad is now obsolete with IndexedDB, starting with a blank slate or the last opened slide might be better.
     updateCanvasSize()
@@ -487,6 +649,8 @@
     window.removeEventListener('resize', updateCanvasSize)
     window.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('keydown', handleSlideshowKey)
+    window.removeEventListener('keydown', handleShareKeyWrapper)
+    window.removeEventListener('popstate', checkCurrentRouteWrapper)
     if (canvasWrapper.value) {
       canvasWrapper.value.removeEventListener('wheel', onWheel)
       canvasWrapper.value.removeEventListener('touchstart', onTouchStart)
@@ -494,6 +658,16 @@
       canvasWrapper.value.removeEventListener('touchend', onTouchEnd)
     }
   })
+
+  // ルーティング関数（composableから使用）
+  function checkCurrentRouteWrapper() {
+    checkCurrentRoute(loadSharedSlide)
+  }
+
+  function formatDate(date) {
+    if (!date) return ''
+    return date.toLocaleString()
+  }
   watch(isSlideshow, (val) => {
     if (val) {
       updateWindowSize();
@@ -605,19 +779,12 @@
     }
   }
   const autoSave = ref(true)
-  // 自動保存の状態変更を監視
-  watch(autoSave, (newVal) => {
-    console.log('自動保存が', newVal ? '有効' : '無効', 'になりました');
-  })
   function toggleAutoSave() {
     autoSave.value = !autoSave.value
   }
   function autoLocalSave() {
     if (autoSave.value) {
-      console.log('自動保存を実行中...');
       localSave();
-    } else {
-      console.log('自動保存は無効です');
     }
   }
   function removeElement() {
@@ -1110,6 +1277,126 @@
       alert('ローカル保存に失敗しました');
     }
   }
+  
+  // Firebase認証関数
+  async function handleGoogleSignIn() {
+    try {
+      const user = await signInWithGoogle();
+      alert(`ログインしました: ${user.displayName}`);
+    } catch (error) {
+      console.error('ログインエラー:', error);
+      alert('ログインに失敗しました');
+    }
+  }
+  
+  async function handleSignOut() {
+    try {
+      await signOutUser();
+      alert('ログアウトしました');
+    } catch (error) {
+      console.error('ログアウトエラー:', error);
+      alert('ログアウトに失敗しました');
+    }
+  }
+  
+  // Firebase スライド操作関数
+  async function saveToCloud() {
+    if (!isLoggedIn.value) {
+      alert('クラウド保存にはログインが必要です');
+      return;
+    }
+    
+    try {
+      const slideData = {
+        title: slidesTitle.value || '無題スライド',
+        slides: toRaw(slides.value)
+      };
+      
+      const savedSlide = await saveSlideToFirestore(slideData, false);
+      alert(`クラウドに保存しました: ${savedSlide.title}`);
+    } catch (error) {
+      console.error('クラウド保存エラー:', error);
+      alert('クラウド保存に失敗しました');
+    }
+  }
+  
+  async function shareSlide() {
+    if (!isLoggedIn.value) {
+      alert('共有機能にはログインが必要です');
+      return;
+    }
+    
+    try {
+      const slideData = {
+        title: slidesTitle.value || '無題スライド',
+        slides: toRaw(slides.value)
+      };
+      
+      console.log('スライドを公開保存中...', slideData.title);
+      const savedSlide = await saveSlideToFirestore(slideData, true);
+      const shareUrl = savedSlide.shareUrl;
+      
+      console.log('共有URL生成:', shareUrl);
+      
+      // クリップボードにコピー
+      await navigator.clipboard.writeText(shareUrl);
+      alert(`共有リンクをクリップボードにコピーしました:\n${shareUrl}\n\n誰でもこのリンクでスライドを閲覧できます。`);
+      
+      // Firebase スライド一覧を更新
+      await loadFirebaseSlides();
+    } catch (error) {
+      console.error('共有エラー:', error);
+      alert('共有に失敗しました: ' + error.message);
+    }
+  }
+  
+  async function loadFirebaseSlides() {
+    if (!isLoggedIn.value) return;
+    
+    try {
+      showFirebaseSlides.value = true;
+      firebaseSlides.value = await getUserSlides();
+    } catch (error) {
+      console.error('Firebaseスライド読み込みエラー:', error);
+      alert('クラウドスライドの読み込みに失敗しました');
+    }
+  }
+  
+  async function openFirebaseSlide(slideId) {
+    try {
+      const slideData = await getSlideFromFirestore(slideId);
+      if (slideData) {
+        slides.value = slideData.slides;
+        slidesTitle.value = slideData.title;
+        slidesMeta.value = { id: slideId, title: slideData.title, isFirebase: true };
+        current.value = 0;
+        selectedElements.value = [];
+        isHome.value = false;
+      }
+    } catch (error) {
+      console.error('Firebaseスライド読み込みエラー:', error);
+      alert('スライドの読み込みに失敗しました');
+    }
+  }
+  
+  async function copyShareUrl(slide) {
+    if (slide.shareUrl) {
+      try {
+        await navigator.clipboard.writeText(slide.shareUrl);
+        alert('共有リンクをクリップボードにコピーしました');
+      } catch (error) {
+        console.error('クリップボードコピーエラー:', error);
+        alert('クリップボードへのコピーに失敗しました');
+      }
+    }
+  }
+  
+
+  async function toggleSlidePublic(slide) {
+    // 実装予定：スライドの公開/非公開を切り替える
+    alert('この機能は開発中です');
+  }
+  
   // ローカル読込 (This function might be deprecated or changed)
   async function localLoad() {
     // For now, this function is not directly used as we load the list on mount.
@@ -1903,6 +2190,86 @@
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     z-index: 10001;
+  }
+  
+  /* Firebase Auth Styles */
+  .auth-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: 16px;
+  }
+  
+  .auth-btn {
+    background: #4285f4 !important;
+    color: white !important;
+  }
+  
+  .auth-btn:hover {
+    background: #3367d6 !important;
+  }
+  
+  .user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .user-name {
+    color: white;
+    font-weight: 600;
+    font-size: 0.9em;
+  }
+  
+  .auth-status {
+    text-align: center;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #e3f2fd;
+    border-radius: 8px;
+    color: #1976d2;
+    font-weight: 600;
+  }
+  
+  .slide-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    justify-content: center;
+  }
+  
+  .tab-btn {
+    padding: 8px 16px;
+    border: 2px solid #007aff;
+    background: white;
+    color: #007aff;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .tab-btn.active {
+    background: #007aff;
+    color: white;
+  }
+  
+  .tab-btn:hover {
+    background: #007aff;
+    color: white;
+  }
+  
+  .firebase-slide {
+    border-left: 4px solid #4285f4;
+  }
+  
+  .firebase-slide .slide-thumb {
+    background: linear-gradient(135deg, #4285f4, #34a853);
+  }
+  
+  .firebase-slide .slide-thumb-placeholder {
+    color: white;
+    font-size: 1.2em;
   }
   </style>
   
