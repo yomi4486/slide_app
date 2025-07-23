@@ -103,7 +103,7 @@ const canvasStyle = computed(() => {
     position: 'relative',
     overflow: 'hidden',
     background: props.background || '#fff',
-    borderRadius: props.slideshow ? '0' : '32px',
+    borderRadius: props.slideshow ? '0' : '8px',
     boxShadow: props.slideshow ? 'none' : '0 8px 32px #0002, 0 1.5px 6px #0001',
   }
   if (props.canvasLeft !== undefined) style.left = props.canvasLeft + 'px'
@@ -136,12 +136,11 @@ defineEmits(['update:inlineEditValue'])
   font-family: 'Inter', 'Helvetica Neue', Arial, 'Hiragino Sans', 'Meiryo', sans-serif !important;
 }
 .slide-canvas {
-  /* 既存のスタイル */
   position: relative;
   overflow: hidden;
 }
 .slide-canvas {
-  border-radius: 32px;
+  border-radius: 16px;
   background: #fff;
   box-shadow: 0 8px 32px #0002, 0 1.5px 6px #0001;
 }

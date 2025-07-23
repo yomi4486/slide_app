@@ -14,10 +14,15 @@
   background: #f4f6fa;
   border-right: 1.5px solid #e0e0e0;
   box-shadow: 2px 0 12px #0001;
-  padding: 0 0 24px 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
 }
 .slide-list-title {
   font-size: 1.1em;
@@ -28,6 +33,7 @@
   letter-spacing: 0.02em;
   border-bottom: 1.5px solid #e0e0e0;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 .slide-list-menu ul {
   list-style: none;
@@ -88,6 +94,7 @@
   align-items: center;
   min-width: 0;
   padding: 0 0 40px 0;
+  margin-left: 220px;
 }
 .add-bar {
   display: flex;
@@ -143,7 +150,7 @@
   width: 100%;
   margin: 0 auto 32px auto;
   padding: 0;
-  border-radius: 32px;
+  border-radius: 16px;
   background: #fff;
   box-shadow: 0 8px 32px #0002, 0 1.5px 6px #0001;
   text-align: center;

@@ -6,7 +6,26 @@
         <button class="home-btn" @click="openFileImport">ファイルから読み込む</button>
         <input type="file" ref="fileImportInput" accept="application/json" style="display:none" @change="onFileImportChange" />
         <div class="slides-list">
-          <div v-for="slide in slidesList" :key="slide.id" class="slide-list-item">
+          <div v-for="(slide, idx) in slidesList" :key="slide.id" class="slide-list-item"
+            @dragover.prevent="onSlideDragOver($event, idx)"
+            @drop.prevent="onSlideDrop($event, idx)"
+            @dragenter.prevent="onSlideDragEnter($event, idx)"
+            @dragleave="onSlideDragLeave($event, idx)"
+            :class="{ 
+              dragging: draggingSlideIdx === idx,
+              'drag-over': dragOverIdx === idx
+            }"
+          >
+            <!-- ドラッグハンドルエリア -->
+            <div class="drag-handle"
+              draggable="true"
+              @dragstart="onSlideDragStart(idx, $event)"
+              @dragend="onSlideDragEnd"
+              title="ドラッグして順序を変更"
+            >
+              <div class="drag-icon">⋮⋮</div>
+            </div>
+            
             <div class="slide-thumb">
               <template v-if="getSlideThumb(slide.id) && getSlideThumb(slide.id).type === 'image'">
                 <img :src="getSlideThumb(slide.id).content" alt="thumb" />
@@ -20,8 +39,10 @@
             </div>
             <div class="slide-title">{{ slide.title }}</div>
             <div class="slide-date">{{ slide.date }}</div>
-            <button @click="openSlidesById(slide.id)">開く</button>
-            <button @click="deleteSlidesById(slide.id)">削除</button>
+            <div class="slide-actions">
+              <button @click.stop="openSlidesById(slide.id)">開く</button>
+              <button @click.stop="deleteSlidesById(slide.id)">削除</button>
+            </div>
           </div>
         </div>
       </div>
@@ -35,7 +56,7 @@
           <button class="app-bar-btn" @click="newSlides">新規</button>
         </div>
       </header>
-      <SlideListMenu :slides="slides" :current="current" @goTo="goTo" @addSlide="addSlide" />
+      <SlideListMenu :slides="slides" :current="current" @goTo="goTo" @addSlide="addSlide" @moveSlide="moveSlide" />
       <main class="keynote-main main-flex">
         <div class="main-center">
           <div style="text-align:center; position:relative; width:100%; display:flex; flex-direction:column; align-items:center;">
@@ -106,7 +127,7 @@
       <!-- Slideshow Overlay -->
       <div v-if="isSlideshow" class="slideshow-overlay">
         <div class="slideshow-canvas-wrapper">
-          <div class="slideshow-canvas-scaler" :style="{ width: baseWidth + 'px', height: baseHeight + 'px', transform: `scale(${slideshowScale.value})`, transformOrigin: 'center center' }">
+          <div class="slideshow-canvas-scaler" :style="{ width: baseWidth + 'px', height: baseHeight + 'px', transform: `scale(${slideshowScale})`, transformOrigin: 'center center' }">
             <SlideCanvas
               :elements="slides[current].elements"
               :selectedElements="[]"
@@ -117,11 +138,29 @@
               :textElementStyle="textElementStyle"
               :isEditingText="alwaysFalse"
               :background="slides[current].background || '#ffffff'"
+              :disabled="true"
+              :selectElement="() => {}"
+              :startDrag="() => {}"
+              :startResize="() => {}"
+              :onCanvasMouseDown="() => {}"
+              :clearSelection="() => {}"
+              :startInlineEdit="() => {}"
+              :finishInlineEdit="() => {}"
             />
           </div>
           <button class="slideshow-exit-btn" @click="endSlideshow">終了</button>
-          <button class="slideshow-prev-btn" @click="current > 0 && (current.value--)" :disabled="current === 0">‹</button>
-          <button class="slideshow-next-btn" @click="current < slides.length - 1 && (current.value++)" :disabled="current === slides.length - 1">›</button>
+          <button 
+            class="slideshow-prev-btn" 
+            :class="{ 'at-boundary': current === 0 }"
+            @click="goToPrevSlide"
+            :title="current === 0 ? '前のスライドがありません。クリックで編集画面に戻ります' : '前のスライド'"
+          >‹</button>
+          <button 
+            class="slideshow-next-btn" 
+            :class="{ 'at-boundary': current === slides.length - 1 }"
+            @click="goToNextSlide"
+            :title="current === slides.length - 1 ? '次のスライドがありません。クリックで編集画面に戻ります' : '次のスライド'"
+          >›</button>
           <div class="slideshow-page">{{ current + 1 }} / {{ slides.length }}</div>
         </div>
       </div>
@@ -139,7 +178,7 @@
           <button @click="resetZoom" :disabled="zoom.value === 1">100%</button>
         </div>
         <button class="bottom-bar-btn" @click="startSlideshow">▶スライドショー</button>
-        <button class="bottom-bar-btn" @click="localSave">ローカル保存</button>
+        <button class="bottom-bar-btn" @click="manualLocalSave">ローカル保存</button>
         <label class="autosave-toggle bottom-autosave">
           <span>自動保存</span>
           <span class="ios-switch">
@@ -252,28 +291,69 @@
   const isSlideshow = ref(false)
   // 新しいslideshowScale定義
   const slideshowScale = computed(() => {
-    return Math.min(windowWidth.value / baseWidth, windowHeight.value / baseHeight)
+    // マージンを考慮してスケールを計算（各方向に40pxのマージンを確保）
+    const margin = 80; // 上下左右40pxずつ
+    const availableWidth = Math.max(windowWidth.value - margin, 100);
+    const availableHeight = Math.max(windowHeight.value - margin, 100);
+    const scale = Math.min(availableWidth / baseWidth, availableHeight / baseHeight);
+    // 最小スケールを0.1に設定して、必ず表示されるようにする
+    return Math.max(scale, 0.1);
   })
   watch(slideshowScale, (val) => {
     console.log('slideshowScale changed:', val);
+    console.log('Window size:', windowWidth.value, 'x', windowHeight.value);
+    console.log('Base size:', baseWidth, 'x', baseHeight);
   });
   function startSlideshow() {
     updateWindowSize(); // 画面サイズを再計算
-    isSlideshow.value = true;
-    document.body.style.overflow = 'hidden';
+    console.log('Starting slideshow...');
+    console.log('Window size before:', windowWidth.value, 'x', windowHeight.value);
+    
+    // 少し遅延を入れてウィンドウサイズが確実に更新されるようにする
+    nextTick(() => {
+      updateWindowSize();
+      console.log('Window size after update:', windowWidth.value, 'x', windowHeight.value);
+      console.log('Base size:', baseWidth, 'x', baseHeight);
+      console.log('Calculated scale:', slideshowScale.value);
+      
+      isSlideshow.value = true;
+      document.body.style.overflow = 'hidden';
+    });
   }
   function endSlideshow() {
     isSlideshow.value = false;
     document.body.style.overflow = '';
     isHome.value = false; // 編集画面に戻す
-    // current.value = 0; // ここは不要なので削除
+    // スライドショー終了後にレイアウトを再計算
+    nextTick(() => {
+      updateWindowSize();
+      updateCanvasSize();
+    });
+  }
+  
+  function goToPrevSlide() {
+    if (current.value > 0) {
+      current.value--;
+    } else {
+      // 最初のスライドで前に戻ろうとした場合、スライドショーを終了
+      endSlideshow();
+    }
+  }
+  
+  function goToNextSlide() {
+    if (current.value < slides.value.length - 1) {
+      current.value++;
+    } else {
+      // 最後のスライドで次に進もうとした場合、スライドショーを終了
+      endSlideshow();
+    }
   }
   function handleSlideshowKey(e) {
     if (!isSlideshow.value) return
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'Enter') {
-      if (current.value < slides.value.length - 1) current.value++
+      goToNextSlide()
     } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-      if (current.value > 0) current.value--
+      goToPrevSlide()
     } else if (e.key === 'Escape') {
       endSlideshow()
     }
@@ -308,9 +388,23 @@
   async function openSlidesById(id) {
     const data = await idb.get(id);
     if (data) {
-      openSlides(JSON.stringify(data));
+      // メタデータを先に設定
       const meta = slidesList.value.find(s => s.id === id);
       if (meta) setSlidesMeta(meta);
+      
+      // スライドデータを読み込み（自動保存は後で）
+      try {
+        if (Array.isArray(data) && data.every(s => s.elements)) {
+          slides.value = data
+          current.value = 0
+          selectedElements.value = []
+        } else {
+          alert('不正なスライドデータです')
+        }
+      } catch {
+        alert('ファイルの読み込みに失敗しました')
+      }
+      
       isHome.value = false;
     }
   }
@@ -341,6 +435,16 @@
     await loadSlidesList();
     setSlidesMeta({ id, title, date });
     alert('新しいスライドとして保存しました');
+  }
+  async function saveSlidesAsNewSilent() {
+    const id = Date.now().toString();
+    const title = slidesTitle.value || '無題スライド';
+    const date = new Date().toLocaleString();
+    updateSlidesMeta(title, date);
+    await idb.set(id, toRaw(slides.value));
+    await loadSlidesList();
+    setSlidesMeta({ id, title, date });
+    // アラートなしの静音バージョン
   }
   async function saveCurrentSlides() {
     if (!slidesMeta.value.id) {
@@ -500,11 +604,20 @@
     }
   }
   const autoSave = ref(true)
+  // 自動保存の状態変更を監視
+  watch(autoSave, (newVal) => {
+    console.log('自動保存が', newVal ? '有効' : '無効', 'になりました');
+  })
   function toggleAutoSave() {
     autoSave.value = !autoSave.value
   }
   function autoLocalSave() {
-    if (autoSave.value) localSave()
+    if (autoSave.value) {
+      console.log('自動保存を実行中...');
+      localSave();
+    } else {
+      console.log('自動保存は無効です');
+    }
   }
   function removeElement() {
     pushHistory()
@@ -897,7 +1010,7 @@
         slides.value = arr
         current.value = 0
         selectedElements.value = []
-        autoLocalSave()
+        // autoLocalSave() を削除 - メタデータ設定後に適切に保存される
       } else {
         alert('不正なスライドデータです')
       }
@@ -913,14 +1026,17 @@
     ]
     current.value = 0
     selectedElements.value = []
+    // メタデータをクリアして新規プロジェクトとして扱う
+    slidesMeta.value = {}
+    slidesTitle.value = ''
     autoLocalSave()
   }
   // ローカル保存
   async function localSave() {
     try {
       if (!slidesMeta.value.id) {
-        // 新規作成時のみID発行
-        await saveSlidesAsNew();
+        // 新規作成時のみID発行（自動保存時は静音）
+        await saveSlidesAsNewSilent();
         return;
       }
       const id = slidesMeta.value.id;
@@ -942,6 +1058,21 @@
       // alert('ローカル保存しました')
     } catch(e) {
       console.error('ローカル保存に失敗しました',e);
+    }
+  }
+  // 手動ローカル保存（アラート付き）
+  async function manualLocalSave() {
+    try {
+      if (!slidesMeta.value.id) {
+        // 新規作成時はアラート付きで保存
+        await saveSlidesAsNew();
+        return;
+      }
+      await localSave();
+      alert('ローカル保存しました');
+    } catch(e) {
+      console.error('ローカル保存に失敗しました',e);
+      alert('ローカル保存に失敗しました');
     }
   }
   // ローカル読込 (This function might be deprecated or changed)
@@ -976,6 +1107,41 @@
     current.value = slides.value.length - 1
     selectedElements.value = []
     autoLocalSave()
+  }
+  
+  function moveSlide(dragIdx, insertIdx) {
+    console.log('スライド移動処理:', dragIdx, '→', insertIdx);
+    pushHistory()
+    
+    // スライドの順序を変更
+    const moved = slides.value.splice(dragIdx, 1)[0];
+    
+    // 挿入位置を調整（ドラッグした要素が取り除かれたため）
+    let finalInsertIdx = insertIdx;
+    if (dragIdx < insertIdx) {
+      finalInsertIdx = insertIdx - 1;
+    }
+    
+    slides.value.splice(finalInsertIdx, 0, moved);
+    
+    console.log('実際の挿入位置:', finalInsertIdx);
+    
+    // 現在のスライドインデックスを調整
+    if (current.value === dragIdx) {
+      // ドラッグしたスライドが現在選択中の場合
+      current.value = finalInsertIdx;
+    } else if (dragIdx < current.value && finalInsertIdx >= current.value) {
+      // ドラッグしたスライドが現在のスライドより前にあり、後ろに移動した場合
+      current.value = current.value - 1;
+    } else if (dragIdx > current.value && finalInsertIdx <= current.value) {
+      // ドラッグしたスライドが現在のスライドより後にあり、前に移動した場合
+      current.value = current.value + 1;
+    }
+    
+    selectedElements.value = []
+    autoLocalSave()
+    
+    console.log('移動完了。新しい current:', current.value);
   }
   
   function moveElementZ(direction) {
@@ -1024,6 +1190,9 @@
     if (!file) return
     const reader = new FileReader()
     reader.onload = (evt) => {
+      // ファイルから読み込む時は新規プロジェクトとして扱う
+      slidesMeta.value = {}
+      slidesTitle.value = ''
       openSlides(evt.target.result)
       isHome.value = false
     }
@@ -1048,6 +1217,78 @@
       slides.value[0].meta.title = slidesTitle.value;
     }
   }
+  // --- スライド一覧ドラッグ＆ドロップ ---
+  const draggingSlideIdx = ref(null)
+  const dragOverIdx = ref(null)
+  
+  function onSlideDragStart(idx, event) {
+    console.log('ドラッグ開始:', idx); // デバッグ用
+    draggingSlideIdx.value = idx
+    // 一部ブラウザで必須
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', idx.toString());
+    
+    // ドラッグ中のゴーストイメージを設定
+    const dragElement = event.currentTarget.closest('.slide-list-item');
+    if (dragElement) {
+      event.dataTransfer.setDragImage(dragElement, 0, 0);
+    }
+  }
+  
+  function onSlideDragEnd() {
+    draggingSlideIdx.value = null;
+    dragOverIdx.value = null;
+  }
+  
+  function onSlideDragOver(event, idx) {
+    event.preventDefault();
+    if (draggingSlideIdx.value !== null && draggingSlideIdx.value !== idx) {
+      dragOverIdx.value = idx;
+    }
+  }
+  
+  function onSlideDragEnter(event, idx) {
+    event.preventDefault();
+    if (draggingSlideIdx.value !== null && draggingSlideIdx.value !== idx) {
+      dragOverIdx.value = idx;
+    }
+  }
+  
+  function onSlideDragLeave(event, idx) {
+    // 要素から完全に出た場合のみクリア
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      if (dragOverIdx.value === idx) {
+        dragOverIdx.value = null;
+      }
+    }
+  }
+  
+  function onSlideDrop(event, dropIdx) {
+    console.log('ドロップ:', draggingSlideIdx.value, '→', dropIdx); // デバッグ用
+    event.preventDefault();
+    if (draggingSlideIdx.value === null || draggingSlideIdx.value === dropIdx) {
+      dragOverIdx.value = null;
+      return;
+    }
+    
+    const dragIdx = draggingSlideIdx.value;
+    const moved = slidesList.value.splice(dragIdx, 1)[0];
+    
+    // ドラッグした要素が後ろから前に移動する場合はインデックスを調整
+    const newIdx = dragIdx < dropIdx ? dropIdx - 1 : dropIdx;
+    slidesList.value.splice(newIdx, 0, moved);
+    
+    draggingSlideIdx.value = null;
+    dragOverIdx.value = null;
+    
+    // 並び順を保存（将来的にIndexedDBやlocalStorageで永続化可能）
+    console.log('スライド順序が変更されました:', slidesList.value.map(s => ({ id: s.id, title: s.title })));
+  }
+  // ---
   </script>
   
   <style>
@@ -1315,6 +1556,54 @@
     align-items: center;
     gap: 16px;
     box-shadow: 0 1px 4px #007aff11;
+    transition: all 0.2s ease;
+    user-select: none;
+    position: relative;
+  }
+  .slide-list-item.dragging {
+    opacity: 0.5;
+    transform: scale(0.98);
+    box-shadow: 0 4px 12px #007aff33;
+  }
+  .slide-list-item.drag-over {
+    background: #e3f0ff;
+    border: 2px dashed #007aff;
+    transform: scale(1.02);
+    box-shadow: 0 4px 16px #007aff44;
+  }
+  .slide-list-item:hover:not(.dragging) {
+    background: #eef2ff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px #007aff22;
+  }
+  .drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 32px;
+    cursor: grab;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+  .drag-handle:active {
+    cursor: grabbing;
+  }
+  .drag-handle:hover {
+    opacity: 1;
+  }
+  .drag-icon {
+    font-size: 14px;
+    font-weight: bold;
+    color: #666;
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+  .slide-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
   }
   .slide-title {
     font-size: 1.1em;
@@ -1337,6 +1626,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s, color 0.2s;
+    flex-shrink: 0;
   }
   .slide-list-item button:hover {
     background: #e3f0ff;
@@ -1461,6 +1751,123 @@
     font-weight: 600;
     user-select: none;
     height: 100%;
+  }
+  
+  /* Slideshow Styles */
+  .slideshow-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .slideshow-canvas-wrapper {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .slideshow-canvas-scaler {
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+  
+  .slideshow-exit-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+    z-index: 10001;
+  }
+  
+  .slideshow-exit-btn:hover {
+    background: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .slideshow-prev-btn, .slideshow-next-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .slideshow-prev-btn {
+    left: 20px;
+  }
+  
+  .slideshow-next-btn {
+    right: 20px;
+  }
+  
+  .slideshow-prev-btn:hover, .slideshow-next-btn:hover {
+    background: #fff;
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  
+  .slideshow-prev-btn:disabled, .slideshow-next-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: translateY(-50%) scale(1);
+  }
+  
+  .slideshow-prev-btn.at-boundary, .slideshow-next-btn.at-boundary {
+    background: rgba(255, 200, 200, 0.9);
+    color: #d32f2f;
+  }
+  
+  .slideshow-prev-btn.at-boundary:hover, .slideshow-next-btn.at-boundary:hover {
+    background: rgba(255, 180, 180, 1);
+    color: #b71c1c;
+  }
+  
+  .slideshow-page {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 1em;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    z-index: 10001;
   }
   </style>
   
