@@ -259,7 +259,29 @@
         <button class="bottom-bar-btn" @click="addLocalImage">＋画像を挿入</button>
         <input type="file" ref="localImageInput" accept="image/*" style="display:none" @change="onLocalImageChange" />
         <button class="bottom-bar-btn" @click="addElement('text')">＋テキスト追加</button>
-        <button class="bottom-bar-btn" @click="addElement('rect')">＋四角形追加</button>
+        
+        <!-- 図形ドロップダウンメニュー -->
+        <div class="shape-menu-container" :class="{ 'menu-open': isShapeMenuOpen }">
+          <button class="bottom-bar-btn shape-btn" @click="toggleShapeMenu">
+            ＋図形
+            <span class="dropdown-arrow">▼</span>
+          </button>
+          <div v-if="isShapeMenuOpen" class="shape-dropdown">
+            <button class="shape-option" @click="addElement('rect')">
+              <span class="shape-icon">⬜</span>
+              四角形
+            </button>
+            <button class="shape-option" @click="addElement('circle')">
+              <span class="shape-icon">⭕</span>
+              円形
+            </button>
+            <button class="shape-option" @click="addElement('line')">
+              <span class="shape-icon">➖</span>
+              線
+            </button>
+          </div>
+        </div>
+        
         <button class="bottom-bar-btn" @click="addQRCode">＋QRコード追加</button>
         <div class="canvas-zoom-ui">
           <button @click="zoomOut" :disabled="Number(zoom.value) <= minZoom">−</button>
@@ -332,7 +354,18 @@
     if (isUserMenuOpen.value && !event.target.closest('.user-menu')) {
       isUserMenuOpen.value = false;
     }
+    if (isShapeMenuOpen.value && !event.target.closest('.shape-menu-container')) {
+      isShapeMenuOpen.value = false;
+    }
   };
+  
+  // 図形メニューの状態
+  const isShapeMenuOpen = ref(false)
+  
+  const toggleShapeMenu = () => {
+    isShapeMenuOpen.value = !isShapeMenuOpen.value
+  }
+  
   const firebaseSlides = ref([])
   const showFirebaseSlides = ref(false)
   
@@ -828,16 +861,21 @@
     pushHistory()
     let el
     if (type === 'image') {
-      el = { type: 'image', content: '', x: 100, y: 100, width: 200, height: 120, shadow: false, background: '' }
+      el = { type: 'image', content: '', x: 100, y: 100, width: 200, height: 120, shadow: false, background: '', opacity: 1 }
     } else if (type === 'text') {
-      el = { type: 'text', content: 'テキスト', x: 150, y: 150, width: 200, height: 60, fontSize: 32, color: '#222222', shadow: false, background: '' }
+      el = { type: 'text', content: 'テキスト', x: 150, y: 150, width: 200, height: 60, fontSize: 32, color: '#222222', shadow: false, background: '', opacity: 1 }
     } else if (type === 'rect') {
-      el = { type: 'rect', x: 120, y: 120, width: 200, height: 120, background: '#1976d2', shadow: false, borderRadius: 0 }
+      el = { type: 'rect', x: 120, y: 120, width: 200, height: 120, background: '#1976d2', shadow: false, borderRadius: 0, opacity: 1 }
+    } else if (type === 'circle') {
+      el = { type: 'circle', x: 120, y: 120, width: 120, height: 120, background: '#1976d2', shadow: false, opacity: 1 }
+    } else if (type === 'line') {
+      el = { type: 'line', x: 120, y: 150, width: 200, height: 4, background: '#1976d2', shadow: false, opacity: 1 }
     } else if (type === 'qr') {
-      el = { type: 'qr', content: 'https://example.com', x: 150, y: 150, width: 150, height: 150, color: '#000000', background: '#ffffff', shadow: false }
+      el = { type: 'qr', content: 'https://example.com', x: 150, y: 150, width: 150, height: 150, color: '#000000', background: '#ffffff', shadow: false, opacity: 1 }
     }
     slides.value[current.value].elements.push(el)
     selectedElements.value = [slides.value[current.value].elements.length - 1]
+    isShapeMenuOpen.value = false // メニューを閉じる
     autoLocalSave()
   }
   
@@ -2097,6 +2135,65 @@
     font-weight: 600;
     user-select: none;
     height: 100%;
+  }
+  
+  /* Shape Menu Styles */
+  .shape-menu-container {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .shape-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .shape-btn .dropdown-arrow {
+    font-size: 0.8em;
+    transition: transform 0.2s;
+  }
+  
+  .shape-menu-container.menu-open .dropdown-arrow {
+    transform: rotate(180deg);
+  }
+  
+  .shape-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 8px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    min-width: 140px;
+    z-index: 10001;
+    overflow: hidden;
+  }
+  
+  .shape-option {
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    background: white;
+    color: #333;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .shape-option:hover {
+    background: #f5f5f5;
+  }
+  
+  .shape-icon {
+    font-size: 1.1em;
+    width: 20px;
+    text-align: center;
   }
   
   /* Slideshow Styles */

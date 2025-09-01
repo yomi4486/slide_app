@@ -75,6 +75,38 @@
           </div>
         </div>
       </template>
+      <template v-if="currentEl?.type === 'circle'">
+        <div class="edit-group color-group">
+          <label class="edit-label">塗りつぶし色</label>
+          <div class="color-row">
+            <input type="color" v-model="currentEl.background" class="edit-color" />
+            <input v-model="currentEl.background" class="edit-input short" />
+          </div>
+        </div>
+        <div class="edit-group">
+          <label class="edit-label">透明度</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="range" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" style="flex:1;" />
+            <input type="number" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" class="edit-input short" />
+          </div>
+        </div>
+      </template>
+      <template v-if="currentEl?.type === 'line'">
+        <div class="edit-group color-group">
+          <label class="edit-label">線の色</label>
+          <div class="color-row">
+            <input type="color" v-model="currentEl.background" class="edit-color" />
+            <input v-model="currentEl.background" class="edit-input short" />
+          </div>
+        </div>
+        <div class="edit-group">
+          <label class="edit-label">透明度</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="range" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" style="flex:1;" />
+            <input type="number" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" class="edit-input short" />
+          </div>
+        </div>
+      </template>
       <template v-if="currentEl?.type === 'qr'">
         <div class="edit-group">
           <label class="edit-label">QRコード内容（URL/テキスト）</label>
@@ -173,6 +205,15 @@ watch(() => currentEl.value, (el) => {
   if (el?.type === 'rect' && el.borderRadius === undefined) {
     el.borderRadius = 0; // デフォルト値を設定
   }
+  // 円形と線の要素の初期化
+  if (el?.type === 'circle' || el?.type === 'line') {
+    if (el.background === undefined) {
+      el.background = '#1976d2'; // デフォルトカラーを設定
+    }
+    if (el.opacity === undefined) {
+      el.opacity = 1; // デフォルト透明度を設定
+    }
+  }
 }, { immediate: true })
 
 // 角丸値が最大値を超えないように制限
@@ -203,7 +244,9 @@ function getElementTypeName(type) {
   const typeNames = {
     'image': '画像',
     'text': 'テキスト',
-    'rect': '図形',
+    'rect': '四角形',
+    'circle': '円形',
+    'line': '線',
     'qr': 'QRコード'
   };
   return typeNames[type] || '要素';
