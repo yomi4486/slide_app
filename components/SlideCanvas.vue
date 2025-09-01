@@ -14,7 +14,7 @@
     >
       <img v-if="el.type === 'image'" :src="el.content" class="slide-el-img" />
       <img v-else-if="el.type === 'qr'" :src="getQRCodeURL(el.content, Math.max(el.width, el.height), el.color, el.background)" class="slide-el-img" :alt="'QRコード: ' + el.content" />
-      <div v-else-if="el.type === 'rect'" :style="{ width: '100%', height: '100%', background: el.background || '#1976d2', borderRadius: '8px', boxShadow: el.shadow ? '0 2px 8px #0003' : 'none', border: '1.5px solid #1976d2', opacity: el.opacity ?? 1 }"></div>
+      <div v-else-if="el.type === 'rect'" :style="{ width: '100%', height: '100%', background: el.background || '#1976d2', borderRadius: (el.borderRadius ?? 0) + 'px', boxShadow: el.shadow ? '0 2px 8px #0003' : 'none', border: '1.5px solid #1976d2', opacity: el.opacity ?? 1 }"></div>
       <template v-else>
         <div
           v-if="!props.isEditingText(i)"

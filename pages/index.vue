@@ -832,7 +832,7 @@
     } else if (type === 'text') {
       el = { type: 'text', content: 'テキスト', x: 150, y: 150, width: 200, height: 60, fontSize: 32, color: '#222222', shadow: false, background: '' }
     } else if (type === 'rect') {
-      el = { type: 'rect', x: 120, y: 120, width: 200, height: 120, background: '#1976d2', shadow: false }
+      el = { type: 'rect', x: 120, y: 120, width: 200, height: 120, background: '#1976d2', shadow: false, borderRadius: 0 }
     } else if (type === 'qr') {
       el = { type: 'qr', content: 'https://example.com', x: 150, y: 150, width: 150, height: 150, color: '#000000', background: '#ffffff', shadow: false }
     }

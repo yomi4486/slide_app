@@ -57,6 +57,17 @@
           </div>
         </div>
         <div class="edit-group">
+          <label class="edit-label">角丸</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="range" min="0" :max="maxBorderRadius" step="1" v-model.number="currentEl.borderRadius" style="flex:1;" />
+            <input type="number" min="0" :max="maxBorderRadius" step="1" v-model.number="currentEl.borderRadius" class="edit-input short" />
+            <span style="font-size:12px;color:#666;">px</span>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px;">
+            最大: {{ maxBorderRadius }}px (図形サイズの半径)
+          </div>
+        </div>
+        <div class="edit-group">
           <label class="edit-label">透明度</label>
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="range" min="0" max="1" step="0.01" v-model.number="currentEl.opacity" style="flex:1;" />
@@ -137,6 +148,14 @@ const props = defineProps(['currentEls', 'slideBackground'])
 const emit = defineEmits(['removeElement', 'moveElementZ', 'update:slideBackground'])
 const currentEl = computed(() => props.currentEls?.[0] || null)
 
+// 四角形の角丸最大値を計算（幅と高さの小さい方の半分）
+const maxBorderRadius = computed(() => {
+  if (currentEl.value?.type === 'rect' && currentEl.value?.width && currentEl.value?.height) {
+    return Math.floor(Math.min(currentEl.value.width, currentEl.value.height) / 2);
+  }
+  return 50; // デフォルト値
+})
+
 // QRコードの場合、幅と高さを同期する
 watch(() => currentEl.value?.width, (newWidth) => {
   if (currentEl.value?.type === 'qr' && newWidth !== undefined) {
@@ -146,6 +165,27 @@ watch(() => currentEl.value?.width, (newWidth) => {
 watch(() => currentEl.value?.height, (newHeight) => {
   if (currentEl.value?.type === 'qr' && newHeight !== undefined) {
     currentEl.value.width = newHeight;
+  }
+})
+
+// 四角形要素のborderRadiusプロパティの初期化
+watch(() => currentEl.value, (el) => {
+  if (el?.type === 'rect' && el.borderRadius === undefined) {
+    el.borderRadius = 0; // デフォルト値を設定
+  }
+}, { immediate: true })
+
+// 角丸値が最大値を超えないように制限
+watch([() => currentEl.value?.borderRadius, maxBorderRadius], ([borderRadius, maxRadius]) => {
+  if (currentEl.value?.type === 'rect' && borderRadius > maxRadius) {
+    currentEl.value.borderRadius = maxRadius;
+  }
+})
+
+// 図形のサイズが変更されたときに角丸値をチェック
+watch([() => currentEl.value?.width, () => currentEl.value?.height], () => {
+  if (currentEl.value?.type === 'rect' && currentEl.value?.borderRadius > maxBorderRadius.value) {
+    currentEl.value.borderRadius = maxBorderRadius.value;
   }
 })
 
